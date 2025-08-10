@@ -1,255 +1,429 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no" />
 <title>Warehouse Forklift Driving Game</title>
-<link rel="manifest" href="manifest.json">
+
+<!-- PWA hooks -->
+<link rel="manifest" href="manifest.json" />
+<meta name="theme-color" content="#0f172a" />
+<link rel="apple-touch-icon" href="icon-192.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black">
+<meta name="apple-mobile-web-app-title" content="Forklift">
+
 <style>
-body{
-  margin:0;
-  background:#0f172a;
-  font-family:sans-serif;
-  color:#f8fafc;
-  text-align:center;
-}
-.row{
-  display:flex;
-  justify-content:center;
-  align-items:center;
-  gap:10px;
-  flex-wrap:wrap;
-  padding:10px;
-}
-button{
-  background:#1e293b;
-  color:white;
-  border:none;
-  padding:8px 14px;
-  border-radius:8px;
-  font-size:16px;
-}
-#game{
-  position:relative;width:100%;margin:8px auto;
-  background:
-    radial-gradient(1200px 600px at 30% -20%, #13213a 0%, #0f1a2a 45%, #0b1220 100%),
-    repeating-linear-gradient(0deg, rgba(255,255,255,.04) 0 2px, transparent 2px 22px),
-    repeating-linear-gradient(90deg, rgba(255,255,255,.03) 0 2px, transparent 2px 22px);
-  background-position:
-    center center,
-    calc(var(--bgx,0px)) calc(var(--bgy,0px)),
-    calc(var(--bgx,0px)/2) calc(var(--bgy,0px)/2);
-  border:2px solid #6b7280;border-radius:12px;overflow:hidden;touch-action:none;
-  max-height: calc(100dvh - 220px);
-}
-.controls{
-  display:flex;
-  justify-content:center;
-  flex-wrap:wrap;
-  gap:10px;
-  padding:10px;
-}
-.controls button{
-  width:60px;height:60px;font-size:22px;
-}
+  :root { --bg:#0f172a; --panel:#111827; --line:#1f2937; --text:#e5e7eb; --dvh: 100dvh; }
+  *{box-sizing:border-box}
+  html,body{
+    height:100%; margin:0; background:var(--bg); color:var(--text);
+    font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;
+    padding:
+      env(safe-area-inset-top)
+      env(safe-area-inset-right)
+      env(safe-area-inset-bottom)
+      env(safe-area-inset-left);
+    overflow-x:hidden;
+  }
+  .wrap{max-width:980px;margin:0 auto;padding:16px}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:16px;
+    box-shadow:0 20px 40px rgba(0,0,0,.25), inset 0 1px 0 rgba(255,255,255,.03)}
+  h1{margin:0 0 8px;line-height:1.05}
+
+  /* Rolling warehouse floor with parallax; bgx/bgy set from JS */
+  #game{
+    --bgx: 0px; --bgy: 0px;
+    position:relative;width:100%;margin:8px auto;
+    background:
+      radial-gradient(1200px 600px at 30% -20%, #13213a 0%, #0f1a2a 45%, #0b1220 100%),
+      repeating-linear-gradient(0deg,  rgba(255,255,255,.04) 0 2px, transparent 2px 22px),
+      repeating-linear-gradient(90deg, rgba(255,255,255,.03) 0 2px, transparent 2px 22px);
+    background-position:
+      center center,
+      calc(var(--bgx)) calc(var(--bgy)),
+      calc(var(--bgx) / 2) calc(var(--bgy) / 2);
+    border:2px solid #6b7280;border-radius:12px;overflow:hidden;touch-action:none;
+    max-height: calc(var(--dvh) - 220px); /* ALWAYS fits on phones */
+  }
+  #stage{position:relative;width:800px;height:500px;transform-origin:top left;filter:drop-shadow(0 10px 18px rgba(0,0,0,.35))}
+
+  /* Walls */
+  .wall{position:absolute;background:#0b1220}
+
+  /* Racking */
+  .rack { position:absolute; pointer-events:none; }
+  .rack .upright{
+    position:absolute; width:8px; height:100%;
+    background:linear-gradient(180deg,#335a7a,#1e3a55);
+    border:1px solid #122638; border-radius:2px;
+    box-shadow:0 1px 0 rgba(255,255,255,.05) inset, 0 6px 10px rgba(0,0,0,.25);
+  }
+  .rack .beam{
+    position:absolute; height:6px;
+    background:linear-gradient(180deg,#f97316,#ea580c);
+    border:1px solid #9a3f07; border-radius:2px;
+    box-shadow:0 1px 0 rgba(255,255,255,.08) inset, 0 3px 6px rgba(0,0,0,.3);
+  }
+  .rack.top  { top:16px;  left:20px; right:140px; height:80px; }
+  .rack.bot  { bottom:16px; left:20px; right:140px; height:80px; }
+
+  /* Dock */
+  .dock{
+    position:absolute; top:50px; right:20px; width:100px; height:400px;
+    background:rgba(34,197,94,.15); border:2px dashed #22c55e; border-radius:8px;
+    display:flex; align-items:center; justify-content:center; color:#86efac; font-weight:700;
+    text-shadow:0 1px 2px rgba(0,0,0,.5); animation:dockPulse 2.4s ease-in-out infinite;
+  }
+  @keyframes dockPulse { 0%,100%{box-shadow:0 0 0 0 rgba(34,197,94,.35)} 50%{box-shadow:0 0 20px 8px rgba(34,197,94,.25)} }
+
+  /* Forklift (high-detail SVG wrapper) */
+  .forklift{
+    position:absolute; width:56px; height:36px; transform-origin:center;
+    filter: drop-shadow(0 3px 6px rgba(0,0,0,.35));
+  }
+  .forklift svg{ width:56px; height:36px; display:block }
+
+  /* Pallets (bevel + sheen) */
+  .pallet{
+    position:absolute; border-radius:6px; border:1px solid rgba(0,0,0,.28);
+    box-shadow:0 1px 0 rgba(255,255,255,.08) inset, 0 6px 10px rgba(0,0,0,.28);
+    overflow:hidden;
+  }
+  .pallet.small{  background:repeating-linear-gradient(0deg,#9bbd7b 0 7px,#84aa62 7px 14px); }
+  .pallet.medium{ background:repeating-linear-gradient(0deg,#c98954 0 7px,#a96e3e 7px 14px); }
+  .pallet.large{  background:repeating-linear-gradient(0deg,#78a9bd 0 7px,#5e93a8 7px 14px); }
+  .pallet.timed{  background:repeating-linear-gradient(0deg,#de8467 0 7px,#c66646 7px 14px); }
+  .pallet::before{
+    content:""; position:absolute; inset:0;
+    background:linear-gradient(90deg, rgba(0,0,0,.18), rgba(255,255,255,.06) 10%, rgba(0,0,0,.12) 90%);
+    mix-blend-mode:multiply; opacity:.55; pointer-events:none;
+  }
+  .pallet::after{
+    content:""; position:absolute; left:6%; right:6%; bottom:-10%;
+    height:28%; border-radius:8px;
+    background: radial-gradient(50% 100% at 50% 0%, rgba(0,0,0,.25), transparent 70%);
+    pointer-events:none;
+  }
+  .pallet .strap{ position:absolute; left:12%; right:12%; top:42%; height:12%;
+    background:linear-gradient(90deg,#2b2b2b,#1a1a1a); opacity:.7; border-radius:2px; }
+  .pallet .label{ position:absolute; right:6px; bottom:6px; width:12px; height:8px;
+    background:#e8ecf3; border:1px solid rgba(0,0,0,.25); border-radius:2px; }
+
+  .row{display:flex;gap:8px;align-items:center;justify-content:space-between;flex-wrap:wrap}
+  .btn{padding:10px 14px;border-radius:10px;border:1px solid #374151;background:#1f2937;color:var(--text);cursor:pointer}
+  .hud{display:flex;gap:12px;align-items:center;flex-wrap:wrap}
+  .hud-right{margin-left:auto;display:flex;gap:8px;align-items:center}
+
+  /* Touch controls */
+  .controls{display:none;margin-top:12px;gap:8px;justify-content:center}
+  .pad{width:70px;height:70px;border-radius:12px;border:1px solid #374151;background:#1f2937;display:flex;align-items:center;justify-content:center;font-weight:700;user-select:none;font-size:20px}
+  @media (max-width: 820px){ .controls{display:flex} }
 </style>
 </head>
 <body>
-<div class="row">
-  <div><strong>Delivered:</strong> <span id="delivered">0</span>/8</div>
-  <div>Score: <span id="score">0</span></div>
-  <div>Time: <span id="timer">00:00.0</span></div>
-  <button id="reset">Reset</button>
-  <button id="share">Share</button>
+<div class="wrap">
+  <div class="card">
+    <div class="row">
+      <h1>Warehouse Forklift Driving Game</h1>
+      <div class="hud">
+        <div><strong>Delivered:</strong> <span id="delivered">0</span>/<span id="target">8</span></div>
+        <div>Score: <span id="score">0</span></div>
+        <div>Time: <span id="timer">00:00.0</span></div>
+        <button id="reset" class="btn">Reset</button>
+      </div>
+      <div class="hud-right">
+        <button id="install" class="btn" style="display:none">Install</button>
+        <button id="share" class="btn">Share</button>
+      </div>
+    </div>
+
+    <div id="game"><div id="stage"></div></div>
+
+    <div class="controls">
+      <div class="pad" data-pad="left">⟵</div>
+      <div style="display:flex;flex-direction:column;gap:8px">
+        <div class="pad" data-pad="up">⟰</div>
+        <div class="pad" data-pad="down">⟱</div>
+      </div>
+      <div class="pad" data-pad="right">⟶</div>
+    </div>
+  </div>
 </div>
-<div id="game">
-  <canvas id="stage" width="800" height="600"></canvas>
-</div>
-<div class="controls">
-  <button id="left">⬅️</button>
-  <button id="up">⬆️</button>
-  <button id="right">➡️</button>
-  <button id="down">⬇️</button>
-</div>
+
 <script>
-const game = document.getElementById('game');
-const stage = document.getElementById('stage');
-const ctx = stage.getContext('2d');
+  // ---------- World / constants ----------
+  const BASE_W=800, BASE_H=500, LIFT_W=56, LIFT_H=36;
+  const SPEED=4, TURN=4, PICK_RADIUS=30, TARGET=8;
 
-const BASE_W = 800, BASE_H = 600;
+  // Rolling floor parameters
+  let bgx = 0, bgy = 0;
+  const BG_SPEED = 0.6;   // floor “roll” per px of forklift movement
+  const BG_IDLE  = 0.08;  // gentle drift when idle
 
-let keys = {};
-let score = 0, delivered = 0, time = 0;
-let timerInterval;
+  const game = document.getElementById('game');
+  const stage= document.getElementById('stage');
+  const scoreEl=document.getElementById('score');
+  const timerEl=document.getElementById('timer');
+  const deliveredEl=document.getElementById('delivered');
+  document.getElementById('target').textContent=TARGET;
 
-let lift = { x:100, y:100, angle:0, carrying:null };
-let pallets = [];
-const SPEED = 2.5;
+  // Walls
+  [{l:0,t:0,w:BASE_W,h:10},{l:0,t:BASE_H-10,w:BASE_W,h:10},{l:0,t:0,w:10,h:BASE_H},{l:BASE_W-10,t:0,w:10,h:BASE_H}]
+    .forEach(s=>{const w=document.createElement('div');w.className='wall';
+      Object.assign(w.style,{left:s.l+'px',top:s.t+'px',width:s.w+'px',height:s.h+'px'});stage.appendChild(w);});
 
-let bgx = 0, bgy = 0;
-const BG_SPEED = 0.6;
-const BG_IDLE  = 0.08;
-
-function spawnPallets(){
-  pallets = [];
-  const colors = ['#f87171','#4ade80','#60a5fa','#facc15'];
-  for(let i=0;i<8;i++){
-    pallets.push({
-      x: Math.random()*(BASE_W-40)+20,
-      y: Math.random()*(BASE_H-40)+20,
-      color: colors[Math.floor(Math.random()*colors.length)],
-      size: 20+Math.random()*20
+  // Racking top & bottom
+  function buildRack(whereClass){
+    const rack = document.createElement('div'); rack.className='rack '+whereClass; stage.appendChild(rack);
+    const left = parseInt(getComputedStyle(rack).left || 20);
+    const right= BASE_W - parseInt(getComputedStyle(rack).right || 140);
+    const width= right - left;
+    const uprights = Math.max(4, Math.floor(width / 120));
+    for(let i=0;i<=uprights;i++){
+      const x = left + Math.round((i/uprights)*width);
+      const u = document.createElement('div'); u.className='upright';
+      Object.assign(u.style,{ left: (x-4)+'px', top:'0', height:'100%'});
+      rack.appendChild(u);
+    }
+    [12,36,60].forEach(y=>{
+      const b=document.createElement('div'); b.className='beam';
+      Object.assign(b.style,{ left: left+'px', right: (BASE_W-right)+'px', top: y+'px' });
+      rack.appendChild(b);
     });
   }
-}
+  buildRack('top'); buildRack('bot');
 
-function resetGame(){
-  score=0; delivered=0; time=0;
-  lift = { x:100, y:100, angle:0, carrying:null };
-  spawnPallets();
-  document.getElementById('score').textContent=score;
-  document.getElementById('delivered').textContent=delivered;
-  document.getElementById('timer').textContent="00:00.0";
-  clearInterval(timerInterval);
-  timerInterval=setInterval(()=>{
-    time+=0.1;
-    const m = String(Math.floor(time/60)).padStart(2,'0');
-    const s = String(Math.floor(time%60)).padStart(2,'0');
-    const ms = Math.floor((time*10)%10);
-    document.getElementById('timer').textContent=`${m}:${s}.${ms}`;
-  },100);
-}
-document.getElementById('reset').onclick=resetGame;
-document.getElementById('share').onclick=()=>{
-  if(navigator.share){
-    navigator.share({
-      title:"Warehouse Forklift Driving Game",
-      text:`I delivered ${delivered}/8 pallets in ${document.getElementById('timer').textContent}!`,
-      url:location.href
+  // Dock
+  const dock = { x: BASE_W-120, y: 50, w: 100, h: 400 };
+  const dockEl = document.createElement('div');
+  dockEl.className='dock';
+  Object.assign(dockEl.style,{left:dock.x+'px',top:dock.y+'px',width:dock.w+'px',height:dock.h+'px'});
+  dockEl.textContent='DOCK';
+  stage.appendChild(dockEl);
+
+  // Forklift (SVG)
+  const liftEl=document.createElement('div'); liftEl.className='forklift';
+  liftEl.innerHTML = `
+<svg viewBox="0 0 56 36" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+  <ellipse cx="28" cy="30" rx="18" ry="6" fill="rgba(0,0,0,.25)"/>
+  <g>
+    <rect x="40" y="22" width="14" height="3" rx="1" fill="#9a7a2c" stroke="#6f5520" stroke-width=".6"/>
+    <rect x="40" y="19" width="8"  height="3" rx="0.8" fill="#b28a35" stroke="#6f5520" stroke-width=".6"/>
+  </g>
+  <rect x="38" y="8" width="4" height="18" rx="1" fill="url(#steel)" stroke="#1a1f26" stroke-width=".6"/>
+  <g filter="url(#inset)">
+    <rect x="8" y="10" width="26" height="16" rx="4" fill="url(#yellow)" stroke="#916f00" stroke-width=".8"/>
+    <rect x="12" y="6" width="12" height="10" rx="2" fill="url(#glass)" stroke="#0b0f1a" stroke-width=".7"/>
+    <rect x="9"  y="18" width="24" height="1.2" fill="rgba(0,0,0,.35)"/>
+    <rect x="9"  y="20.5" width="24" height="1.2" fill="rgba(0,0,0,.25)"/>
+  </g>
+  <g>
+    <circle cx="18" cy="28" r="5.5" fill="url(#tire)" stroke="#0a0d12" stroke-width="1"/>
+    <circle cx="18" cy="28" r="2"  fill="#6b7280"/>
+    <circle cx="30" cy="28" r="5"   fill="url(#tire)" stroke="#0a0d12" stroke-width="1"/>
+    <circle cx="30" cy="28" r="2"   fill="#6b7280"/>
+  </g>
+  <defs>
+    <linearGradient id="yellow" x1="0" x2="0" y1="0" y2="1">
+      <stop offset="0" stop-color="#ffe46a"/>
+      <stop offset=".65" stop-color="#facc15"/>
+      <stop offset="1" stop-color="#e6b80f"/>
+    </linearGradient>
+    <linearGradient id="glass" x1="0" x2="0" y1="0" y2="1">
+      <stop offset="0" stop-color="#39414f"/>
+      <stop offset="1" stop-color="#10141c"/>
+    </linearGradient>
+    <linearGradient id="steel" x1="0" x2="0" y1="0" y2="1">
+      <stop offset="0" stop-color="#4b5563"/>
+      <stop offset="1" stop-color="#1f2937"/>
+    </linearGradient>
+    <radialGradient id="tire" cx=".35" cy=".35">
+      <stop offset="0" stop-color="#2a3039"/>
+      <stop offset="1" stop-color="#0f131a"/>
+    </radialGradient>
+    <filter id="inset">
+      <feDropShadow dx="0" dy="1" stdDeviation="1.2" flood-opacity=".28"/>
+    </filter>
+  </defs>
+</svg>`;
+  stage.appendChild(liftEl);
+
+  // Pallets
+  const TYPES=[{k:'small',size:22,score:1},{k:'medium',size:30,score:2},{k:'large',size:44,score:3},{k:'timed',size:30,score:4,life:7000}];
+  const rand=(a,b)=>Math.floor(Math.random()*(b-a+1))+a;
+  const makeId=()=>self.crypto?.randomUUID?crypto.randomUUID():String(Math.random()).slice(2);
+  function spawnPallet(){
+    const t=TYPES[Math.floor(Math.random()*TYPES.length)];
+    return { id:makeId(), x:rand(40, BASE_W-160), y:rand(40, BASE_H-60),
+      type:t.k, size:t.size, score:t.score, expiresAt:t.life?Date.now()+t.life:null, collected:false, attached:false };
+  }
+  const pallets=Array.from({length:6},()=>spawnPallet());
+  const palletEls=new Map();
+  function decoratePallet(el){
+    if(Math.random()<0.45){ const s=document.createElement('div'); s.className='strap'; el.appendChild(s); }
+    if(Math.random()<0.35){ const lab=document.createElement('div'); lab.className='label'; el.appendChild(lab); }
+  }
+
+  // Helpers
+  function forksTip(p){ const r=p.a*Math.PI/180; return {x:p.x+26*Math.cos(r)+LIFT_W/2, y:p.y+26*Math.sin(r)+LIFT_H/2}; }
+  function inDock(x,y){ return x>=dock.x && x<=dock.x+dock.w && y>=dock.y && y<=dock.y+dock.h; }
+
+  function renderPallets(){
+    const now=Date.now();
+    pallets.forEach(p=>{
+      let el=palletEls.get(p.id);
+      if(p.collected){ if(el){el.remove(); palletEls.delete(p.id);} return; }
+      if(p.expiresAt && !p.attached && now>p.expiresAt){
+        p.collected=true; if(el){el.remove(); palletEls.delete(p.id);} pallets.push(spawnPallet()); return;
+      }
+      if(!el){ el=document.createElement('div'); el.className=`pallet ${p.type}`; palletEls.set(p.id,el); stage.appendChild(el); decoratePallet(el); }
+      if(p.attached){
+        const tip=forksTip(lift); el.style.left=(tip.x - p.size/2)+'px'; el.style.top =(tip.y - p.size/2)+'px'; el.style.opacity='1';
+      }else{
+        el.style.left=(p.x - p.size/2)+'px'; el.style.top =(p.y - p.size/2)+'px';
+        if(p.expiresAt){ const left=Math.max(0,p.expiresAt-now); el.style.opacity=(0.35+0.65*(left/7000)).toFixed(2); }
+        else el.style.opacity='1';
+      }
+      el.style.width=p.size+'px'; el.style.height=p.size+'px';
     });
-  } else {
-    alert("Sharing not supported on this device.");
+    scoreEl.textContent = score; deliveredEl.textContent = delivered;
   }
-}
 
-function fit() {
-  const header   = document.querySelector('.row');
-  const controls = document.querySelector('.controls');
-
-  const vw  = Math.min(window.innerWidth,  document.documentElement.clientWidth);
-  const dvh = Math.min(window.innerHeight, document.documentElement.clientHeight);
-
-  const headerH   = header   ? header.getBoundingClientRect().height   : 0;
-  const controlsH = (controls && getComputedStyle(controls).display !== 'none')
-                     ? controls.getBoundingClientRect().height : 0;
-  const gutters   = 24;
-
-  const availableH = Math.max(240, dvh - headerH - controlsH - gutters);
-  const scale = Math.min(vw / BASE_W, availableH / BASE_H, 1);
-
-  const tx = (vw  - BASE_W * scale) / 2;
-  const ty = (availableH - BASE_H * scale) / 2;
-
-  stage.style.transform = `translate(${tx}px, ${Math.max(0, ty)}px) scale(${scale})`;
-  game.style.height = availableH + 'px';
-  game.style.maxHeight = availableH + 'px';
-}
-addEventListener('resize', fit);
-addEventListener('orientationchange', fit);
-new ResizeObserver(fit).observe(game);
-
-function tick(){
-  if(keys.left) lift.angle -= 0.05;
-  if(keys.right) lift.angle += 0.05;
-  if(keys.up || keys.down){
-    const dir = keys.up ? 1 : -1;
-    lift.x += Math.cos(lift.angle) * SPEED * dir;
-    lift.y += Math.sin(lift.angle) * SPEED * dir;
-
-    bgx -= dir * Math.cos(lift.angle) * SPEED * BG_SPEED;
-    bgy -= dir * Math.sin(lift.angle) * SPEED * BG_SPEED;
-  } else {
-    bgx -= BG_IDLE;
-    bgy -= BG_IDLE;
-  }
-  game.style.setProperty('--bgx', bgx + 'px');
-  game.style.setProperty('--bgy', bgy + 'px');
-
-  lift.x = Math.max(0, Math.min(BASE_W, lift.x));
-  lift.y = Math.max(0, Math.min(BASE_H, lift.y));
-
-  pallets.forEach((p,i)=>{
-    const dx = lift.x - p.x;
-    const dy = lift.y - p.y;
-    if(Math.hypot(dx,dy) < 20 && !lift.carrying){
-      lift.carrying = p;
-      pallets.splice(i,1);
-    }
+  // Input (continuous)
+  const keys={left:false,right:false,up:false,down:false};
+  addEventListener('keydown',e=>{ if(e.key==='ArrowLeft')keys.left=true; if(e.key==='ArrowRight')keys.right=true; if(e.key==='ArrowUp')keys.up=true; if(e.key==='ArrowDown')keys.down=true; });
+  addEventListener('keyup',e=>{ if(e.key==='ArrowLeft')keys.left=false; if(e.key==='ArrowRight')keys.right=false; if(e.key==='ArrowUp')keys.up=false; if(e.key==='ArrowDown')keys.down=false; });
+  document.querySelectorAll('[data-pad]').forEach(el=>{
+    const dir=el.dataset.pad;
+    el.addEventListener('pointerdown',e=>{e.preventDefault(); keys[dir]=true;});
+    el.addEventListener('pointerup',e=>{e.preventDefault(); keys[dir]=false;});
+    el.addEventListener('pointercancel',()=>{keys[dir]=false;});
+    el.addEventListener('pointerleave',()=>{keys[dir]=false;});
   });
 
-  if(lift.carrying && lift.x>750 && lift.y>250 && lift.y<350){
-    score += 10;
-    delivered++;
-    lift.carrying=null;
-    document.getElementById('score').textContent=score;
-    document.getElementById('delivered').textContent=delivered;
-    if(delivered>=8){
-      clearInterval(timerInterval);
-      alert("All pallets delivered!");
+  // Sizing (uses real viewport height)
+  function fit() {
+    const header   = document.querySelector('.row');
+    const controls = document.querySelector('.controls');
+
+    const vw  = Math.min(window.innerWidth,  document.documentElement.clientWidth);
+    const dvh = Math.min(window.innerHeight, document.documentElement.clientHeight); // URL-bar aware
+
+    const headerH   = header   ? header.getBoundingClientRect().height   : 0;
+    const controlsH = (controls && getComputedStyle(controls).display !== 'none')
+                       ? controls.getBoundingClientRect().height : 0;
+    const gutters   = 24;
+    const availableH = Math.max(240, dvh - headerH - controlsH - gutters);
+
+    const scale = Math.min(vw / BASE_W, availableH / BASE_H, 1);
+
+    const tx = (vw  - BASE_W * scale) / 2;
+    const ty = (availableH - BASE_H * scale) / 2;
+
+    stage.style.transform = `translate(${tx}px, ${Math.max(0, ty)}px) scale(${scale})`;
+    game.style.height = availableH + 'px';
+    game.style.maxHeight = availableH + 'px';
+  }
+  addEventListener('resize', fit);
+  addEventListener('orientationchange', fit);
+  new ResizeObserver(fit).observe(game);
+  fit();
+
+  // Loop / timer
+  let delivered=0, score=0, lift={x:80,y:80,a:0}, runStart=null, timerRAF=null;
+  const clamp=(v,min,max)=>Math.max(min,Math.min(max,v));
+  const fmt=ms=>ms==null?"00:00.0":(()=>{const s=ms/1000,m=Math.floor(s/60),ss=Math.floor(s%60),t=Math.floor((s*10)%10);return `${String(m).padStart(2,'0')}:${String(ss).padStart(2,'0')}.${t}`;})();
+  function tickTimer(){ if(!runStart) return; timerEl.textContent=fmt(performance.now()-runStart); timerRAF=requestAnimationFrame(tickTimer); }
+
+  function tick(){
+    // Heading
+    if(keys.left)  lift.a-=TURN;
+    if(keys.right) lift.a+=TURN;
+    const r=lift.a*Math.PI/180, cos=Math.cos(r), sin=Math.sin(r);
+
+    // Movement
+    let moved=false;
+    if(keys.up){   lift.x+=SPEED*cos; lift.y+=SPEED*sin; moved=true; }
+    if(keys.down){ lift.x-=SPEED*cos; lift.y-=SPEED*sin; moved=true; }
+    if(moved){ runStart=runStart??performance.now(); if(!timerRAF) tickTimer(); }
+
+    // Clamp bounds
+    lift.x=clamp(lift.x,10,BASE_W-LIFT_W-10);
+    lift.y=clamp(lift.y,10,BASE_H-LIFT_H-10);
+
+    // Rolling floor parallax
+    if (keys.up || keys.down) {
+      const dir = keys.up ? 1 : -1;
+      bgx -= dir * cos * SPEED * BG_SPEED;
+      bgy -= dir * sin * SPEED * BG_SPEED;
+    } else {
+      bgx -= BG_IDLE; bgy -= BG_IDLE;
     }
+    game.style.setProperty('--bgx', bgx + 'px');
+    game.style.setProperty('--bgy', bgy + 'px');
+
+    const tip=forksTip(lift);
+
+    // Carrying?
+    let carrying=pallets.find(p=>p.attached && !p.collected);
+
+    // Try pickup when moving/turning
+    if(!carrying && (keys.up||keys.down||keys.left||keys.right)){
+      for(const p of pallets){
+        if(p.collected||p.attached) continue;
+        const dx=p.x-(lift.x+LIFT_W/2), dy=p.y-(lift.y+LIFT_H/2);
+        const threshold=Math.max(PICK_RADIUS, p.size*0.8);
+        if(Math.hypot(dx,dy)<threshold){ p.attached=true; break; }
+      }
+      carrying=pallets.find(p=>p.attached && !p.collected);
+    }
+
+    // Deliver
+    if(carrying && inDock(tip.x, tip.y)){
+      carrying.collected=true; carrying.attached=false;
+      score+=carrying.score; delivered+=1;
+      pallets.push(spawnPallet());
+      if(delivered>=TARGET){ delivered=TARGET; /* timer left running for replay */ }
+    }
+
+    // Render
+    liftEl.style.left=lift.x+'px'; liftEl.style.top=lift.y+'px'; liftEl.style.transform=`rotate(${lift.a}deg)`;
+    renderPallets();
+    requestAnimationFrame(tick);
   }
-}
-
-function render(){
-  ctx.clearRect(0,0,BASE_W,BASE_H);
-  ctx.fillStyle="rgba(0,255,0,0.1)";
-  ctx.fillRect(750,250,50,100);
-  ctx.strokeStyle="#22c55e";
-  ctx.strokeRect(750,250,50,100);
-  ctx.fillStyle="#22c55e";
-  ctx.font="16px sans-serif";
-  ctx.fillText("DOCK", 755, 300);
-
-  pallets.forEach(p=>{
-    ctx.fillStyle=p.color;
-    ctx.fillRect(p.x-10, p.y-10, p.size, p.size);
-  });
-
-  if(lift.carrying){
-    ctx.fillStyle=lift.carrying.color;
-    ctx.fillRect(lift.x-10, lift.y-30, lift.carrying.size, lift.carrying.size);
-  }
-
-  ctx.save();
-  ctx.translate(lift.x, lift.y);
-  ctx.rotate(lift.angle);
-  ctx.fillStyle="yellow";
-  ctx.fillRect(-15,-10,30,20);
-  ctx.fillStyle="gray";
-  ctx.fillRect(10,-2,10,4);
-  ctx.restore();
-}
-
-function loop(){
   tick();
-  render();
-  requestAnimationFrame(loop);
-}
 
-document.addEventListener('keydown',e=>{ keys[e.key.toLowerCase()] = true; });
-document.addEventListener('keyup',e=>{ keys[e.key.toLowerCase()] = false; });
-document.getElementById('left').ontouchstart=()=>keys.left=true;
-document.getElementById('left').ontouchend=()=>keys.left=false;
-document.getElementById('up').ontouchstart=()=>keys.up=true;
-document.getElementById('up').ontouchend=()=>keys.up=false;
-document.getElementById('right').ontouchstart=()=>keys.right=true;
-document.getElementById('right').ontouchend=()=>keys.right=false;
-document.getElementById('down').ontouchstart=()=>keys.down=true;
-document.getElementById('down').ontouchend=()=>keys.down=false;
+  // Reset
+  document.getElementById('reset').onclick=()=>{
+    lift={x:80,y:80,a:0}; score=0; delivered=0;
+    pallets.splice(0,pallets.length,...Array.from({length:6},()=>spawnPallet()));
+    palletEls.forEach(el=>el.remove()); palletEls.clear();
+    renderPallets(); timerEl.textContent='00:00.0'; runStart=null; if(timerRAF) cancelAnimationFrame(timerRAF); timerRAF=null;
+  };
 
-resetGame();
-fit();
-loop();
+  // Share
+  document.getElementById('share').onclick=async ()=>{
+    const url=location.href, text="Try my Forklift Dock Challenge!";
+    try{
+      if(navigator.share){ await navigator.share({title:"Forklift Game",text,url}); }
+      else if(navigator.clipboard){ await navigator.clipboard.writeText(url); alert("Link copied:\n"+url); }
+      else{ prompt("Copy this link:", url); }
+    }catch(e){}
+  };
+
+  // Install (PWA)
+  let deferredPrompt=null;
+  const installBtn=document.getElementById('install');
+  window.addEventListener('beforeinstallprompt',(e)=>{ e.preventDefault(); deferredPrompt=e; installBtn.style.display='inline-flex'; });
+  installBtn?.addEventListener('click', async ()=>{
+    if(!deferredPrompt) return;
+    installBtn.disabled=true;
+    try{ await deferredPrompt.prompt(); await deferredPrompt.userChoice; } finally { deferredPrompt=null; installBtn.style.display='none'; }
+  });
+
+  // Service worker
+  if('serviceWorker' in navigator){ addEventListener('load',()=>navigator.serviceWorker.register('./sw.js').catch(()=>{})); }
 </script>
 </body>
 </html>
