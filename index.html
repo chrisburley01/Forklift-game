@@ -1,79 +1,54 @@
-
 <!doctype html>
 <html lang="en">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Forklift Game</title>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Forklift Game</title>
 
-  <!-- PWA -->
-  <link rel="manifest" href="manifest.json">
-  <meta name="theme-color" content="#0f172a" />
+<!-- PWA hooks (keep your manifest.json + sw.js in repo root) -->
+<link rel="manifest" href="manifest.json" />
+<meta name="theme-color" content="#0f172a" />
 
-  <style>
-    :root { --bg:#0f172a; --panel:#111827; --line:#1f2937; --text:#e5e7eb; }
-    *{box-sizing:border-box}
-    html,body{height:100%;margin:0;background:var(--bg);color:var(--text);font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif}
-    .wrap{max-width:980px;margin:0 auto;padding:16px}
-    .card{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:16px;box-shadow:0 10px 20px rgba(0,0,0,.2)}
-    h1{margin:0 0 8px;line-height:1.05}
-    #game{position:relative;width:100%;margin:8px auto;background:#0f1a2a;border:2px solid #6b7280;border-radius:12px;overflow:hidden;touch-action:none}
-    #stage{position:relative;width:800px;height:500px;transform-origin:top left}
+<style>
+  :root { --bg:#0f172a; --panel:#111827; --line:#1f2937; --text:#e5e7eb; }
+  *{box-sizing:border-box}
+  html,body{height:100%;margin:0;background:var(--bg);color:var(--text);font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif}
+  .wrap{max-width:980px;margin:0 auto;padding:16px}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:16px;box-shadow:0 10px 20px rgba(0,0,0,.2)}
+  h1{margin:0 0 8px;line-height:1.05}
+  #game{position:relative;width:100%;margin:8px auto;background:#0f1a2a;border:2px solid #6b7280;border-radius:12px;overflow:hidden;touch-action:none}
+  #stage{position:relative;width:800px;height:500px;transform-origin:top left}
 
-    /* Walls */
-    .wall{position:absolute;background:#0b1220}
+  /* Walls */
+  .wall{position:absolute;background:#0b1220}
 
-    /* Forklift */
-    .forklift{position:absolute;width:46px;height:26px;transform-origin:center}
-    .lift-body{
-      position:absolute; left:6px; top:6px; width:34px; height:14px;
-      background:linear-gradient(180deg,#ffd84a,#facc15);
-      border-radius:4px; box-shadow:0 2px 8px rgba(0,0,0,.45) inset;
-      border:1px solid #b08900;
-    }
-    .lift-cab{
-      position:absolute; left:8px; top:2px; width:11px; height:10px;
-      background:linear-gradient(180deg,#2f3640,#111827); border-radius:2px;
-      border:1px solid #0b0f1a;
-    }
-    .lift-mast{
-      position:absolute; right:2px; top:2px; width:4px; height:18px;
-      background:linear-gradient(180deg,#3b3f46,#1f2937); border-radius:2px;
-      border:1px solid #161b22;
-    }
-    .lift-forks{
-      position:absolute; right:-10px; top:16px; width:20px; height:4px;
-      background:linear-gradient(180deg,#c8a95a,#9a7a2c); border-radius:2px;
-      box-shadow:0 0 0 1px #6b5b2a inset;
-    }
-    .lift-wheel{
-      position:absolute; width:8px; height:8px; border-radius:50%;
-      background:radial-gradient(circle at 30% 30%, #6b7280, #111827);
-      border:1px solid #090d14;
-      bottom:-3px; box-shadow:0 1px 1px rgba(0,0,0,.6);
-    }
-    .lift-wheel.front{ left:10px }
-    .lift-wheel.rear{ left:28px }
+  /* Forklift */
+  .forklift{position:absolute;width:46px;height:26px;transform-origin:center}
+  .lift-body{position:absolute;left:6px;top:6px;width:34px;height:14px;background:linear-gradient(180deg,#ffd84a,#facc15);border-radius:4px;border:1px solid #b08900;box-shadow:0 2px 8px rgba(0,0,0,.45) inset}
+  .lift-cab{position:absolute;left:8px;top:2px;width:11px;height:10px;background:linear-gradient(180deg,#2f3640,#111827);border-radius:2px;border:1px solid #0b0f1a}
+  .lift-mast{position:absolute;right:2px;top:2px;width:4px;height:18px;background:linear-gradient(180deg,#3b3f46,#1f2937);border-radius:2px;border:1px solid #161b22}
+  .lift-forks{position:absolute;right:-10px;top:16px;width:20px;height:4px;background:linear-gradient(180deg,#c8a95a,#9a7a2c);border-radius:2px;box-shadow:0 0 0 1px #6b5b2a inset}
+  .lift-wheel{position:absolute;width:8px;height:8px;border-radius:50%;background:radial-gradient(circle at 30% 30%, #6b7280, #111827);border:1px solid #090d14;bottom:-3px;box-shadow:0 1px 1px rgba(0,0,0,.6)}
+  .lift-wheel.front{left:10px}.lift-wheel.rear{left:28px}
 
-    /* Pallets */
-    .pallet{
-      position:absolute; width:30px; height:30px;
-      background:repeating-linear-gradient(0deg, #b87333 0 6px, #a05e22 6px 12px);
-      border:2px solid #8b4a0e; border-radius:4px; box-shadow:0 2px 6px rgba(0,0,0,.35);
-    }
-    .pallet::before{ content:""; position:absolute; inset:4px 6px;
-      background:linear-gradient(90deg,#2f2f2f,#1f1f1f); opacity:.6; border-radius:1px; }
-    .pallet::after{ content:""; position:absolute; inset:2px; box-shadow:0 0 8px rgba(255,140,0,.25); border-radius:3px; }
+  /* Pallets (appearance set by classes + inline size) */
+  .pallet{position:absolute;border-radius:4px;box-shadow:0 2px 6px rgba(0,0,0,.35);border:2px solid rgba(0,0,0,.25)}
+  .pallet::before{content:"";position:absolute;inset:15% 20%;background:linear-gradient(90deg,#2f2f2f,#1f1f1f);opacity:.5;border-radius:2px}
+  .pallet.small  {background:repeating-linear-gradient(0deg,#9ec27f 0 6px,#7aa95a 6px 12px)}
+  .pallet.medium {background:repeating-linear-gradient(0deg,#b87333 0 6px,#a05e22 6px 12px)}
+  .pallet.large  {background:repeating-linear-gradient(0deg,#7fb1c2 0 6px,#5e97aa 6px 12px)}
+  .pallet.timed  {background:repeating-linear-gradient(0deg,#d97a5c 0 6px,#c55c3a 6px 12px)}
 
-    .row{display:flex;gap:8px;align-items:center;justify-content:space-between;flex-wrap:wrap}
-    .btn{padding:10px 14px;border-radius:10px;border:1px solid #374151;background:#1f2937;color:var(--text);cursor:pointer}
-    .hud{display:flex;gap:12px;align-items:center;flex-wrap:wrap}
+  .row{display:flex;gap:8px;align-items:center;justify-content:space-between;flex-wrap:wrap}
+  .btn{padding:10px 14px;border-radius:10px;border:1px solid #374151;background:#1f2937;color:var(--text);cursor:pointer}
+  .hud{display:flex;gap:12px;align-items:center;flex-wrap:wrap}
+  .hud-right{margin-left:auto;display:flex;gap:8px;align-items:center}
 
-    /* Touch controls */
-    .controls{display:none;margin-top:12px;gap:8px;justify-content:center}
-    .pad{width:70px;height:70px;border-radius:12px;border:1px solid #374151;background:#1f2937;display:flex;align-items:center;justify-content:center;font-weight:700;user-select:none}
-    @media (max-width: 820px){ .controls{display:flex} }
-  </style>
+  /* Touch controls */
+  .controls{display:none;margin-top:12px;gap:8px;justify-content:center}
+  .pad{width:70px;height:70px;border-radius:12px;border:1px solid #374151;background:#1f2937;display:flex;align-items:center;justify-content:center;font-weight:700;user-select:none}
+  @media (max-width: 820px){ .controls{display:flex} }
+</style>
 </head>
 <body>
   <div class="wrap">
@@ -81,8 +56,11 @@
       <div class="row">
         <h1>Warehouse Forklift Driving Game</h1>
         <div class="hud">
-          <div><strong>Score:</strong> <span id="score">0</span>/<span id="total">0</span></div>
+          <div><strong>Score:</strong> <span id="score">0</span></div>
           <button id="reset" class="btn">Reset</button>
+        </div>
+        <div class="hud-right">
+          <button id="share" class="btn">Share</button>
         </div>
       </div>
       <p style="margin:8px 0 12px">Keyboard: Arrow keys. On phone: use the pads below.</p>
@@ -102,88 +80,160 @@
     </div>
   </div>
 
-  <script>
-    // World constants (logical px)
-    const BASE_W=800, BASE_H=500, LIFT_W=46, LIFT_H=26, SPEED=4, TURN=4, PALLET_RADIUS=30;
+<script>
+  // ---- World constants ----
+  const BASE_W=800, BASE_H=500, LIFT_W=46, LIFT_H=26;
+  const SPEED=4, TURN=4;
+  const PICK_RADIUS=30; // collection threshold (base units)
 
-    const game  = document.getElementById('game');
-    const stage = document.getElementById('stage');
-    const scoreEl = document.getElementById('score');
-    const totalEl = document.getElementById('total');
+  const game  = document.getElementById('game');
+  const stage = document.getElementById('stage');
+  const scoreEl = document.getElementById('score');
 
-    // Walls
-    [{l:0,t:0,w:BASE_W,h:10},{l:0,t:BASE_H-10,w:BASE_W,h:10},{l:0,t:0,w:10,h:BASE_H},{l:BASE_W-10,t:0,w:10,h:BASE_H}]
-      .forEach(s=>{const w=document.createElement('div');w.className='wall';
-        Object.assign(w.style,{left:s.l+'px',top:s.t+'px',width:s.w+'px',height:s.h+'px'});stage.appendChild(w);});
+  // ---- Build walls ----
+  [{l:0,t:0,w:BASE_W,h:10},{l:0,t:BASE_H-10,w:BASE_W,h:10},{l:0,t:0,w:10,h:BASE_H},{l:BASE_W-10,t:0,w:10,h:BASE_H}]
+    .forEach(s=>{const w=document.createElement('div');w.className='wall';
+      Object.assign(w.style,{left:s.l+'px',top:s.t+'px',width:s.w+'px',height:s.h+'px'});stage.appendChild(w);});
 
-    // Forklift (composed)
-    const liftEl=document.createElement('div'); liftEl.className='forklift';
-    liftEl.innerHTML=`<div class="lift-body"></div><div class="lift-cab"></div><div class="lift-mast"></div>
-      <div class="lift-forks"></div><div class="lift-wheel front"></div><div class="lift-wheel rear"></div>`;
-    stage.appendChild(liftEl);
+  // ---- Forklift ----
+  const liftEl=document.createElement('div'); liftEl.className='forklift';
+  liftEl.innerHTML=`<div class="lift-body"></div><div class="lift-cab"></div><div class="lift-mast"></div>
+    <div class="lift-forks"></div><div class="lift-wheel front"></div><div class="lift-wheel rear"></div>`;
+  stage.appendChild(liftEl);
 
-    // Pallets
-    const pallets=[{id:1,x:200,y:150,c:false},{id:2,x:350,y:300,c:false},{id:3,x:520,y:220,c:false},{id:4,x:700,y:120,c:false},{id:5,x:140,y:380,c:false}];
-    totalEl.textContent=pallets.length;
-    const palletEls=new Map();
-    function renderPallets(){
-      pallets.forEach(p=>{
-        let el=palletEls.get(p.id);
-        if(p.c){ if(el){el.remove(); palletEls.delete(p.id);} return; }
-        if(!el){ el=document.createElement('div'); el.className='pallet'; palletEls.set(p.id,el); stage.appendChild(el); }
-        el.style.left=p.x+'px'; el.style.top=p.y+'px';
-      });
-      scoreEl.textContent=pallets.filter(p=>p.c).length;
-    }
-    renderPallets();
+  // ---- Pallets (sizes, colors, timed) ----
+  const TYPES=[
+    {k:'small',  size:22, score:1},
+    {k:'medium', size:30, score:2},
+    {k:'large',  size:44, score:3},
+    {k:'timed',  size:30, score:4, life:7000} // fades then disappears
+  ];
+  const rand=(a,b)=>Math.floor(Math.random()*(b-a+1))+a;
+  const makeId=()=>self.crypto?.randomUUID?crypto.randomUUID():String(Math.random()).slice(2);
 
-    // Input – keyboard
-    const keys={l:false,r:false,u:false,d:false};
-    addEventListener('keydown',e=>{if(e.key==='ArrowLeft')keys.l=true;if(e.key==='ArrowRight')keys.r=true;if(e.key==='ArrowUp')keys.u=true;if(e.key==='ArrowDown')keys.d=true;});
-    addEventListener('keyup',e=>{if(e.key==='ArrowLeft')keys.l=false;if(e.key==='ArrowRight')keys.r=false;if(e.key==='ArrowUp')keys.u=false;if(e.key==='ArrowDown')keys.d=false;});
+  function spawnPallet(){
+    const t=TYPES[Math.floor(Math.random()*TYPES.length)];
+    return {
+      id: makeId(),
+      x: rand(40, BASE_W-60),
+      y: rand(40, BASE_H-60),
+      type: t.k,
+      size: t.size,
+      score: t.score,
+      expiresAt: t.life ? Date.now()+t.life : null,
+      collected:false
+    };
+  }
 
-    // Input – touch pads
-    const activePads=new Set();
-    const padSet=(d,on)=>{on?activePads.add(d):activePads.delete(d);keys.l=activePads.has('left');keys.r=activePads.has('right');keys.u=activePads.has('up');keys.d=activePads.has('down');};
-    document.querySelectorAll('[data-pad]').forEach(el=>{
-      const start=e=>{e.preventDefault();padSet(el.dataset.pad,true);};
-      const end=e=>{e.preventDefault();padSet(el.dataset.pad,false);};
-      el.addEventListener('pointerdown',start); el.addEventListener('pointerup',end);
-      el.addEventListener('pointercancel',end); el.addEventListener('pointerleave',end);
+  const pallets = Array.from({length:6}, () => spawnPallet());
+  const palletEls=new Map();
+
+  function renderPallets(now=Date.now()){
+    pallets.forEach(p=>{
+      let el=palletEls.get(p.id);
+      if(p.collected){ if(el){el.remove(); palletEls.delete(p.id);} return; }
+
+      // timed out?
+      if(p.expiresAt && now>p.expiresAt){
+        p.collected=true;
+        if(el){el.remove(); palletEls.delete(p.id);}
+        pallets.push(spawnPallet());
+        return;
+      }
+
+      if(!el){ el=document.createElement('div'); el.className=`pallet ${p.type}`; palletEls.set(p.id,el); stage.appendChild(el); }
+      el.style.width=p.size+'px';
+      el.style.height=p.size+'px';
+      el.style.left=(p.x-p.size/2)+'px';
+      el.style.top=(p.y-p.size/2)+'px';
+
+      // fade timed pallets
+      if(p.expiresAt){
+        const left=Math.max(0,p.expiresAt-now);
+        el.style.opacity=(0.35+0.65*(left/7000)).toFixed(2);
+      } else el.style.opacity='1';
     });
 
-    // Center + scale stage to fit container
-    function fit(){
-      const cw=game.clientWidth; const s=Math.min(cw/BASE_W,1);
-      stage.style.transform=`translateX(${(cw-BASE_W*s)/2}px) scale(${s})`;
-      game.style.height=(BASE_H*s)+'px';
+    scoreEl.textContent = score;
+  }
+
+  // ---- Input ----
+  const keys={l:false,r:false,u:false,d:false};
+  addEventListener('keydown',e=>{if(e.key==='ArrowLeft')keys.l=true;if(e.key==='ArrowRight')keys.r=true;if(e.key==='ArrowUp')keys.u=true;if(e.key==='ArrowDown')keys.d=true;});
+  addEventListener('keyup',e=>{if(e.key==='ArrowLeft')keys.l=false;if(e.key==='ArrowRight')keys.r=false;if(e.key==='ArrowUp')keys.u=false;if(e.key==='ArrowDown')keys.d=false;});
+
+  // Touch pads
+  const activePads=new Set();
+  const padSet=(d,on)=>{on?activePads.add(d):activePads.delete(d);keys.l=activePads.has('left');keys.r=activePads.has('right');keys.u=activePads.has('up');keys.d=activePads.has('down');};
+  document.querySelectorAll('[data-pad]').forEach(el=>{
+    const start=e=>{e.preventDefault();padSet(el.dataset.pad,true);};
+    const end=e=>{e.preventDefault();padSet(el.dataset.pad,false);};
+    el.addEventListener('pointerdown',start); el.addEventListener('pointerup',end);
+    el.addEventListener('pointercancel',end); el.addEventListener('pointerleave',end);
+  });
+
+  // ---- Center + scale stage ----
+  function fit(){
+    const cw=game.clientWidth; const s=Math.min(cw/BASE_W,1);
+    stage.style.transform=`translateX(${(cw-BASE_W*s)/2}px) scale(${s})`;
+    game.style.height=(BASE_H*s)+'px';
+  }
+  addEventListener('resize',fit); new ResizeObserver(fit).observe(game); fit();
+
+  // ---- Loop ----
+  let lift={x:80,y:80,a:0}, score=0;
+  const clamp=(v,min,max)=>Math.max(min,Math.min(max,v));
+
+  function tick(){
+    if(keys.l) lift.a-=TURN; if(keys.r) lift.a+=TURN;
+    const r=lift.a*Math.PI/180;
+    if(keys.u){lift.x+=SPEED*Math.cos(r); lift.y+=SPEED*Math.sin(r);}
+    if(keys.d){lift.x-=SPEED*Math.cos(r); lift.y-=SPEED*Math.sin(r);}
+
+    lift.x=clamp(lift.x,10,BASE_W-LIFT_W-10);
+    lift.y=clamp(lift.y,10,BASE_H-LIFT_H-10);
+
+    const now=Date.now();
+    for(const p of pallets){
+      if(!p.collected){
+        const dx=p.x-lift.x, dy=p.y-lift.y;
+        const threshold=Math.max(PICK_RADIUS, p.size*0.8);
+        if(Math.hypot(dx,dy)<threshold){
+          p.collected=true;
+          score+=p.score;
+          pallets.push(spawnPallet());
+        }
+      }
     }
-    addEventListener('resize',fit); new ResizeObserver(fit).observe(game); fit();
+    renderPallets(now);
 
-    // Game state/loop
-    let lift={x:80,y:80,a:0};
-    const clamp=(v,min,max)=>Math.max(min,Math.min(max,v));
+    liftEl.style.left=lift.x+'px'; liftEl.style.top=lift.y+'px';
+    liftEl.style.transform=`rotate(${lift.a}deg)`;
 
-    function tick(){
-      if(keys.l) lift.a-=TURN; if(keys.r) lift.a+=TURN;
-      const rad=lift.a*Math.PI/180;
-      if(keys.u){lift.x+=SPEED*Math.cos(rad); lift.y+=SPEED*Math.sin(rad);}
-      if(keys.d){lift.x-=SPEED*Math.cos(rad); lift.y-=SPEED*Math.sin(rad);}
-
-      lift.x=clamp(lift.x,10,BASE_W-LIFT_W-10); lift.y=clamp(lift.y,10,BASE_H-LIFT_H-10);
-
-      for(const p of pallets){ if(!p.c){ const dx=p.x-lift.x, dy=p.y-lift.y; if(Math.hypot(dx,dy)<PALLET_RADIUS) p.c=true; } }
-      renderPallets();
-
-      liftEl.style.left=lift.x+'px'; liftEl.style.top=lift.y+'px'; liftEl.style.transform=`rotate(${lift.a}deg)`;
-      requestAnimationFrame(tick);
-    }
     requestAnimationFrame(tick);
+  }
+  requestAnimationFrame(tick);
 
-    document.getElementById('reset').onclick=()=>{ lift={x:80,y:80,a:0}; pallets.forEach(p=>p.c=false); renderPallets(); };
+  // ---- Reset ----
+  document.getElementById('reset').onclick=()=>{
+    lift={x:80,y:80,a:0}; score=0;
+    pallets.splice(0,pallets.length,...Array.from({length:6},()=>spawnPallet()));
+    palletEls.forEach(el=>el.remove()); palletEls.clear();
+    renderPallets();
+  };
 
-    // PWA service worker
-    if('serviceWorker' in navigator){ addEventListener('load', ()=>navigator.serviceWorker.register('./sw.js').catch(()=>{})); }
-  </script>
+  // ---- Share button ----
+  document.getElementById('share').onclick=async ()=>{
+    const url=location.href, text="Play my Forklift game!";
+    try{
+      if(navigator.share){ await navigator.share({title:"Forklift Game",text,url}); }
+      else if(navigator.clipboard){ await navigator.clipboard.writeText(url); alert("Link copied:\n"+url); }
+      else{ prompt("Copy this link:", url); }
+    }catch(e){ /* user cancelled */ }
+  };
+
+  // ---- PWA SW ----
+  if('serviceWorker' in navigator){ addEventListener('load',()=>navigator.serviceWorker.register('./sw.js').catch(()=>{})); }
+</script>
 </body>
 </html>
