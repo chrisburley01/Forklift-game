@@ -16,17 +16,59 @@
     .wrap{max-width:980px;margin:0 auto;padding:16px}
     .card{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:16px;box-shadow:0 10px 20px rgba(0,0,0,.2)}
     h1{margin:0 0 8px;line-height:1.05}
-    /* Outer container defines available width; height set by JS to match scaled stage */
     #game{position:relative;width:100%;margin:8px auto;background:#0f1a2a;border:2px solid #6b7280;border-radius:12px;overflow:hidden;touch-action:none}
-    /* Inner fixed-size stage that we scale */
     #stage{position:relative;width:800px;height:500px;transform-origin:top left}
+
+    /* Walls */
     .wall{position:absolute;background:#0b1220}
-    .forklift{position:absolute;width:40px;height:20px;background:#facc15;border-radius:4px;box-shadow:0 2px 8px rgba(0,0,0,.4);transform-origin:center}
-    .pallet{position:absolute;width:30px;height:30px;background:#92400e;border:2px solid #b45309;border-radius:4px;box-shadow:0 2px 6px rgba(0,0,0,.3)}
+
+    /* Forklift */
+    .forklift{position:absolute;width:46px;height:26px;transform-origin:center}
+    .lift-body{
+      position:absolute; left:6px; top:6px; width:34px; height:14px;
+      background:linear-gradient(180deg,#ffd84a,#facc15);
+      border-radius:4px; box-shadow:0 2px 8px rgba(0,0,0,.45) inset;
+      border:1px solid #b08900;
+    }
+    .lift-cab{
+      position:absolute; left:8px; top:2px; width:11px; height:10px;
+      background:linear-gradient(180deg,#2f3640,#111827); border-radius:2px;
+      border:1px solid #0b0f1a;
+    }
+    .lift-mast{
+      position:absolute; right:2px; top:2px; width:4px; height:18px;
+      background:linear-gradient(180deg,#3b3f46,#1f2937); border-radius:2px;
+      border:1px solid #161b22;
+    }
+    .lift-forks{
+      position:absolute; right:-10px; top:16px; width:20px; height:4px;
+      background:linear-gradient(180deg,#c8a95a,#9a7a2c); border-radius:2px;
+      box-shadow:0 0 0 1px #6b5b2a inset;
+    }
+    .lift-wheel{
+      position:absolute; width:8px; height:8px; border-radius:50%;
+      background:radial-gradient(circle at 30% 30%, #6b7280, #111827);
+      border:1px solid #090d14;
+      bottom:-3px; box-shadow:0 1px 1px rgba(0,0,0,.6);
+    }
+    .lift-wheel.front{ left:10px }
+    .lift-wheel.rear{ left:28px }
+
+    /* Pallets */
+    .pallet{
+      position:absolute; width:30px; height:30px;
+      background:repeating-linear-gradient(0deg, #b87333 0 6px, #a05e22 6px 12px);
+      border:2px solid #8b4a0e; border-radius:4px; box-shadow:0 2px 6px rgba(0,0,0,.35);
+    }
+    .pallet::before{ content:""; position:absolute; inset:4px 6px;
+      background:linear-gradient(90deg,#2f2f2f,#1f1f1f); opacity:.6; border-radius:1px; }
+    .pallet::after{ content:""; position:absolute; inset:2px; box-shadow:0 0 8px rgba(255,140,0,.25); border-radius:3px; }
+
     .row{display:flex;gap:8px;align-items:center;justify-content:space-between;flex-wrap:wrap}
     .btn{padding:10px 14px;border-radius:10px;border:1px solid #374151;background:#1f2937;color:var(--text);cursor:pointer}
     .hud{display:flex;gap:12px;align-items:center;flex-wrap:wrap}
-    /* Mobile touch controls */
+
+    /* Touch controls */
     .controls{display:none;margin-top:12px;gap:8px;justify-content:center}
     .pad{width:70px;height:70px;border-radius:12px;border:1px solid #374151;background:#1f2937;display:flex;align-items:center;justify-content:center;font-weight:700;user-select:none}
     @media (max-width: 820px){ .controls{display:flex} }
@@ -44,7 +86,6 @@
       </div>
       <p style="margin:8px 0 12px">Keyboard: Arrow keys. On phone: use the pads below.</p>
 
-      <!-- Game -->
       <div id="game" aria-label="Forklift game area">
         <div id="stage"></div>
       </div>
@@ -61,141 +102,10 @@
   </div>
 
   <script>
-    // ---- Constants (base pixels) ----
-    const BASE_W = 800, BASE_H = 500;
-    const LIFT_W = 40, LIFT_H = 20;
-    const SPEED = 4, TURN = 4;
-    const PALLET_RADIUS = 30;
+    // World constants (logical px)
+    const BASE_W=800, BASE_H=500, LIFT_W=46, LIFT_H=26, SPEED=4, TURN=4, PALLET_RADIUS=30;
 
-    // Elements
-    const game = document.getElementById('game');
+    const game  = document.getElementById('game');
     const stage = document.getElementById('stage');
     const scoreEl = document.getElementById('score');
     const totalEl = document.getElementById('total');
-
-    // Game state (base units)
-    let forklift = { x:80, y:80, angle:0 };
-    const pallets = [
-      { id:1, x:200, y:150, collected:false },
-      { id:2, x:350, y:300, collected:false },
-      { id:3, x:520, y:220, collected:false },
-      { id:4, x:700, y:120, collected:false },
-      { id:5, x:140, y:380, collected:false },
-    ];
-    totalEl.textContent = pallets.length;
-
-    // Build walls (fixed px on stage)
-    [
-      {left:0, top:0, width:BASE_W, height:10},
-      {left:0, top:BASE_H-10, width:BASE_W, height:10},
-      {left:0, top:0, width:10, height:BASE_H},
-      {left:BASE_W-10, top:0, width:10, height:BASE_H}
-    ].forEach(s=>{
-      const w=document.createElement('div'); w.className='wall';
-      Object.assign(w.style, {left:s.left+'px', top:s.top+'px', width:s.width+'px', height:s.height+'px'});
-      stage.appendChild(w);
-    });
-
-    // Forklift
-    const liftEl = document.createElement('div');
-    liftEl.className = 'forklift';
-    Object.assign(liftEl.style, { width:LIFT_W+'px', height:LIFT_H+'px' });
-    stage.appendChild(liftEl);
-
-    // Pallets
-    const palletEls = new Map();
-    function renderPallets(){
-      pallets.forEach(p=>{
-        let el = palletEls.get(p.id);
-        if(p.collected){ if(el){ el.remove(); palletEls.delete(p.id); } return; }
-        if(!el){ el = document.createElement('div'); el.className='pallet'; el.style.width='30px'; el.style.height='30px'; palletEls.set(p.id, el); stage.appendChild(el); }
-        el.style.left = p.x + 'px';
-        el.style.top  = p.y + 'px';
-      });
-      scoreEl.textContent = pallets.filter(p=>p.collected).length;
-    }
-    renderPallets();
-
-    // Input: keyboard
-    const keys = { left:false, right:false, up:false, down:false };
-    addEventListener('keydown', e=>{
-      if(e.key==='ArrowLeft') keys.left=true;
-      if(e.key==='ArrowRight') keys.right=true;
-      if(e.key==='ArrowUp') keys.up=true;
-      if(e.key==='ArrowDown') keys.down=true;
-    });
-    addEventListener('keyup', e=>{
-      if(e.key==='ArrowLeft') keys.left=false;
-      if(e.key==='ArrowRight') keys.right=false;
-      if(e.key==='ArrowUp') keys.up=false;
-      if(e.key==='ArrowDown') keys.down=false;
-    });
-
-    // Input: touch pads
-    const activePads = new Set();
-    const padSet = (d,on)=>{ on?activePads.add(d):activePads.delete(d); syncPads(); };
-    const syncPads = ()=>{ keys.left=activePads.has('left'); keys.right=activePads.has('right'); keys.up=activePads.has('up'); keys.down=activePads.has('down'); };
-    document.querySelectorAll('[data-pad]').forEach(el=>{
-      const start=e=>{e.preventDefault(); padSet(el.dataset.pad,true);};
-      const end=e=>{e.preventDefault(); padSet(el.dataset.pad,false);};
-      el.addEventListener('pointerdown', start);
-      el.addEventListener('pointerup', end);
-      el.addEventListener('pointercancel', end);
-      el.addEventListener('pointerleave', end);
-    });
-
-    // Scaling: scale stage to fit container width; set container height accordingly
-    function fit(){
-      const cw = game.clientWidth;         // available width inside the card
-      const s = Math.min(cw / BASE_W, 1);  // never upscale above 1 (looks crisp on desktop)
-      stage.style.transform = `scale(${s})`;
-      game.style.height = (BASE_H * s) + 'px';
-    }
-    addEventListener('resize', fit);
-    new ResizeObserver(fit).observe(game);
-    fit();
-
-    // Helpers
-    const clamp = (v,min,max)=>Math.max(min,Math.min(max,v));
-
-    // Loop
-    function tick(){
-      if(keys.left)  forklift.angle -= TURN;
-      if(keys.right) forklift.angle += TURN;
-      const rad = forklift.angle*Math.PI/180;
-      if(keys.up){   forklift.x += SPEED*Math.cos(rad); forklift.y += SPEED*Math.sin(rad); }
-      if(keys.down){ forklift.x -= SPEED*Math.cos(rad); forklift.y -= SPEED*Math.sin(rad); }
-
-      forklift.x = clamp(forklift.x, 10, BASE_W - LIFT_W - 10);
-      forklift.y = clamp(forklift.y, 10, BASE_H - LIFT_H - 10);
-
-      for(const p of pallets){
-        if(!p.collected){
-          const dx = p.x - forklift.x, dy = p.y - forklift.y;
-          if(Math.hypot(dx,dy) < PALLET_RADIUS) p.collected = true;
-        }
-      }
-      renderPallets();
-
-      liftEl.style.left = forklift.x + 'px';
-      liftEl.style.top  = forklift.y + 'px';
-      liftEl.style.transform = `rotate(${forklift.angle}deg)`;
-
-      requestAnimationFrame(tick);
-    }
-    requestAnimationFrame(tick);
-
-    // Reset
-    document.getElementById('reset').onclick = ()=>{
-      forklift = { x:80, y:80, angle:0 };
-      pallets.forEach(p=>p.collected=false);
-      renderPallets();
-    };
-
-    // PWA SW
-    if ('serviceWorker' in navigator) {
-      addEventListener('load', () => navigator.serviceWorker.register('./sw.js').catch(()=>{}));
-    }
-  </script>
-</body>
-</html>
