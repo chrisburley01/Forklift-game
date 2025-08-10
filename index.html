@@ -1,4 +1,3 @@
-
 <!doctype html>
 <html lang="en">
 <head>
@@ -6,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>Forklift Game</title>
 
-<!-- PWA hooks (keep your manifest.json + sw.js in repo root) -->
+<!-- PWA -->
 <link rel="manifest" href="manifest.json" />
 <meta name="theme-color" content="#0f172a" />
 
@@ -23,7 +22,15 @@
   /* Walls */
   .wall{position:absolute;background:#0b1220}
 
-  /* Forklift */
+  /* Dock zone */
+  .dock{
+    position:absolute; top:50px; right:20px; width:100px; height:400px;
+    background:rgba(34,197,94,.15); border:2px dashed #22c55e; border-radius:8px;
+    display:flex; align-items:center; justify-content:center; color:#86efac; font-weight:700;
+    text-shadow:0 1px 2px rgba(0,0,0,.5);
+  }
+
+  /* Forklift (composed) */
   .forklift{position:absolute;width:46px;height:26px;transform-origin:center}
   .lift-body{position:absolute;left:6px;top:6px;width:34px;height:14px;background:linear-gradient(180deg,#ffd84a,#facc15);border-radius:4px;border:1px solid #b08900;box-shadow:0 2px 8px rgba(0,0,0,.45) inset}
   .lift-cab{position:absolute;left:8px;top:2px;width:11px;height:10px;background:linear-gradient(180deg,#2f3640,#111827);border-radius:2px;border:1px solid #0b0f1a}
@@ -32,7 +39,7 @@
   .lift-wheel{position:absolute;width:8px;height:8px;border-radius:50%;background:radial-gradient(circle at 30% 30%, #6b7280, #111827);border:1px solid #090d14;bottom:-3px;box-shadow:0 1px 1px rgba(0,0,0,.6)}
   .lift-wheel.front{left:10px}.lift-wheel.rear{left:28px}
 
-  /* Pallets (appearance set by classes + inline size) */
+  /* Pallets (size/colour via classes + inline size) */
   .pallet{position:absolute;border-radius:4px;box-shadow:0 2px 6px rgba(0,0,0,.35);border:2px solid rgba(0,0,0,.25)}
   .pallet::before{content:"";position:absolute;inset:15% 20%;background:linear-gradient(90deg,#2f2f2f,#1f1f1f);opacity:.5;border-radius:2px}
   .pallet.small  {background:repeating-linear-gradient(0deg,#9ec27f 0 6px,#7aa95a 6px 12px)}
@@ -44,6 +51,7 @@
   .btn{padding:10px 14px;border-radius:10px;border:1px solid #374151;background:#1f2937;color:var(--text);cursor:pointer}
   .hud{display:flex;gap:12px;align-items:center;flex-wrap:wrap}
   .hud-right{margin-left:auto;display:flex;gap:8px;align-items:center}
+  .muted{opacity:.85}
 
   /* Touch controls */
   .controls{display:none;margin-top:12px;gap:8px;justify-content:center}
@@ -57,14 +65,19 @@
       <div class="row">
         <h1>Warehouse Forklift Driving Game</h1>
         <div class="hud">
-          <div><strong>Score:</strong> <span id="score">0</span></div>
+          <div><strong>Delivered:</strong> <span id="delivered">0</span>/<span id="target">8</span></div>
+          <div class="muted">Score: <span id="score">0</span></div>
+          <div class="muted">Time: <span id="timer">00:00.0</span></div>
+          <div class="muted">Best: <span id="best">--:--.-</span></div>
+          <div class="muted">Last: <span id="last">--:--.-</span></div>
+          <div class="muted">Runs: <span id="runs">0</span></div>
           <button id="reset" class="btn">Reset</button>
         </div>
         <div class="hud-right">
           <button id="share" class="btn">Share</button>
         </div>
       </div>
-      <p style="margin:8px 0 12px">Keyboard: Arrow keys. On phone: use the pads below.</p>
+      <p style="margin:8px 0 12px">Pick up a pallet, then deliver it to the green <strong>Dock</strong> on the right. Timed pallets fade and vanish!</p>
 
       <div id="game" aria-label="Forklift game area">
         <div id="stage"></div>
@@ -82,32 +95,47 @@
   </div>
 
 <script>
-  // ---- World constants ----
+  // ---------- World ----------
   const BASE_W=800, BASE_H=500, LIFT_W=46, LIFT_H=26;
-  const SPEED=4, TURN=4;
-  const PICK_RADIUS=30; // collection threshold (base units)
+  const SPEED=4, TURN=4, PICK_RADIUS=30;
+  const TARGET_DELIVERIES = 8;
 
   const game  = document.getElementById('game');
   const stage = document.getElementById('stage');
-  const scoreEl = document.getElementById('score');
 
-  // ---- Build walls ----
+  const deliveredEl = document.getElementById('delivered');
+  const targetEl    = document.getElementById('target'); targetEl.textContent = TARGET_DELIVERIES;
+  const scoreEl     = document.getElementById('score');
+  const timerEl     = document.getElementById('timer');
+  const bestEl      = document.getElementById('best');
+  const lastEl      = document.getElementById('last');
+  const runsEl      = document.getElementById('runs');
+
+  // Walls
   [{l:0,t:0,w:BASE_W,h:10},{l:0,t:BASE_H-10,w:BASE_W,h:10},{l:0,t:0,w:10,h:BASE_H},{l:BASE_W-10,t:0,w:10,h:BASE_H}]
     .forEach(s=>{const w=document.createElement('div');w.className='wall';
       Object.assign(w.style,{left:s.l+'px',top:s.t+'px',width:s.w+'px',height:s.h+'px'});stage.appendChild(w);});
 
-  // ---- Forklift ----
+  // Dock
+  const dock = { x: BASE_W-120, y: 50, w: 100, h: 400 };
+  const dockEl = document.createElement('div');
+  dockEl.className='dock';
+  Object.assign(dockEl.style,{left:dock.x+'px',top:dock.y+'px',width:dock.w+'px',height:dock.h+'px'});
+  dockEl.textContent='DOCK';
+  stage.appendChild(dockEl);
+
+  // Forklift
   const liftEl=document.createElement('div'); liftEl.className='forklift';
   liftEl.innerHTML=`<div class="lift-body"></div><div class="lift-cab"></div><div class="lift-mast"></div>
     <div class="lift-forks"></div><div class="lift-wheel front"></div><div class="lift-wheel rear"></div>`;
   stage.appendChild(liftEl);
 
-  // ---- Pallets (sizes, colors, timed) ----
+  // Pallets
   const TYPES=[
     {k:'small',  size:22, score:1},
     {k:'medium', size:30, score:2},
     {k:'large',  size:44, score:3},
-    {k:'timed',  size:30, score:4, life:7000} // fades then disappears
+    {k:'timed',  size:30, score:4, life:7000}
   ];
   const rand=(a,b)=>Math.floor(Math.random()*(b-a+1))+a;
   const makeId=()=>self.crypto?.randomUUID?crypto.randomUUID():String(Math.random()).slice(2);
@@ -116,53 +144,59 @@
     const t=TYPES[Math.floor(Math.random()*TYPES.length)];
     return {
       id: makeId(),
-      x: rand(40, BASE_W-60),
+      x: rand(40, BASE_W-160), // keep some distance from dock
       y: rand(40, BASE_H-60),
-      type: t.k,
-      size: t.size,
-      score: t.score,
+      type: t.k, size: t.size, score: t.score,
       expiresAt: t.life ? Date.now()+t.life : null,
-      collected:false
+      collected:false, attached:false
     };
   }
 
   const pallets = Array.from({length:6}, () => spawnPallet());
   const palletEls=new Map();
 
+  function forksTip(pose){
+    const offset=26, rad=pose.a*Math.PI/180;
+    return { x: pose.x + offset*Math.cos(rad) + LIFT_W/2,
+             y: pose.y + offset*Math.sin(rad) + LIFT_H/2 };
+  }
+  function inDock(x,y){ return x>=dock.x && x<=dock.x+dock.w && y>=dock.y && y<=dock.y+dock.h; }
+
   function renderPallets(now=Date.now()){
     pallets.forEach(p=>{
       let el=palletEls.get(p.id);
       if(p.collected){ if(el){el.remove(); palletEls.delete(p.id);} return; }
 
-      // timed out?
-      if(p.expiresAt && now>p.expiresAt){
-        p.collected=true;
-        if(el){el.remove(); palletEls.delete(p.id);}
-        pallets.push(spawnPallet());
-        return;
+      if(p.expiresAt && !p.attached && now>p.expiresAt){
+        p.collected=true; if(el){el.remove(); palletEls.delete(p.id);} pallets.push(spawnPallet()); return;
       }
 
       if(!el){ el=document.createElement('div'); el.className=`pallet ${p.type}`; palletEls.set(p.id,el); stage.appendChild(el); }
-      el.style.width=p.size+'px';
-      el.style.height=p.size+'px';
-      el.style.left=(p.x-p.size/2)+'px';
-      el.style.top=(p.y-p.size/2)+'px';
 
-      // fade timed pallets
-      if(p.expiresAt){
-        const left=Math.max(0,p.expiresAt-now);
-        el.style.opacity=(0.35+0.65*(left/7000)).toFixed(2);
-      } else el.style.opacity='1';
+      if(p.attached){
+        const tip=forksTip(lift);
+        el.style.left=(tip.x - p.size/2)+'px';
+        el.style.top =(tip.y - p.size/2)+'px';
+        el.style.opacity='1';
+      }else{
+        el.style.left=(p.x-p.size/2)+'px';
+        el.style.top =(p.y-p.size/2)+'px';
+        if(p.expiresAt){
+          const left=Math.max(0,p.expiresAt-now);
+          el.style.opacity=(0.35+0.65*(left/7000)).toFixed(2);
+        } else el.style.opacity='1';
+      }
+      el.style.width=p.size+'px'; el.style.height=p.size+'px';
     });
 
     scoreEl.textContent = score;
+    deliveredEl.textContent = delivered;
   }
 
-  // ---- Input ----
+  // Input
   const keys={l:false,r:false,u:false,d:false};
   addEventListener('keydown',e=>{if(e.key==='ArrowLeft')keys.l=true;if(e.key==='ArrowRight')keys.r=true;if(e.key==='ArrowUp')keys.u=true;if(e.key==='ArrowDown')keys.d=true;});
   addEventListener('keyup',e=>{if(e.key==='ArrowLeft')keys.l=false;if(e.key==='ArrowRight')keys.r=false;if(e.key==='ArrowUp')keys.u=false;if(e.key==='ArrowDown')keys.d=false;});
-
   // Touch pads
   const activePads=new Set();
   const padSet=(d,on)=>{on?activePads.add(d):activePads.delete(d);keys.l=activePads.has('left');keys.r=activePads.has('right');keys.u=activePads.has('up');keys.d=activePads.has('down');};
@@ -173,16 +207,33 @@
     el.addEventListener('pointercancel',end); el.addEventListener('pointerleave',end);
   });
 
-  // ---- Center + scale stage ----
-  function fit(){
-    const cw=game.clientWidth; const s=Math.min(cw/BASE_W,1);
+  // Center/scale stage
+  function fit(){ const cw=game.clientWidth; const s=Math.min(cw/BASE_W,1);
     stage.style.transform=`translateX(${(cw-BASE_W*s)/2}px) scale(${s})`;
     game.style.height=(BASE_H*s)+'px';
   }
   addEventListener('resize',fit); new ResizeObserver(fit).observe(game); fit();
 
-  // ---- Loop ----
-  let lift={x:80,y:80,a:0}, score=0;
+  // Timer + runs
+  let runStart=null, timerRAF=null, delivered=0, score=0;
+  const runs=[]; // ms
+
+  const fmt=ms=>ms==null?"--:--.-":(()=>{const s=ms/1000,m=Math.floor(s/60),ss=Math.floor(s%60),t=Math.floor((s*10)%10);return `${String(m).padStart(2,'0')}:${String(ss).padStart(2,'0')}.${t}`;})();
+
+  function startTimerIfNeeded(){ if(!runStart){ runStart=performance.now(); tickTimer(); } }
+  function stopTimerAndLog(){
+    if(!runStart) return;
+    const elapsed=performance.now()-runStart;
+    runs.push(elapsed);
+    lastEl.textContent=fmt(elapsed);
+    bestEl.textContent=fmt(Math.min(...runs));
+    runsEl.textContent=String(runs.length);
+    cancelAnimationFrame(timerRAF); timerRAF=null; runStart=null;
+  }
+  function tickTimer(){ if(!runStart) return; timerEl.textContent=fmt(performance.now()-runStart); timerRAF=requestAnimationFrame(tickTimer); }
+
+  // Loop
+  let lift={x:80,y:80,a:0};
   const clamp=(v,min,max)=>Math.max(min,Math.min(max,v));
 
   function tick(){
@@ -190,50 +241,60 @@
     const r=lift.a*Math.PI/180;
     if(keys.u){lift.x+=SPEED*Math.cos(r); lift.y+=SPEED*Math.sin(r);}
     if(keys.d){lift.x-=SPEED*Math.cos(r); lift.y-=SPEED*Math.sin(r);}
+    lift.x=clamp(lift.x,10,BASE_W-LIFT_W-10); lift.y=clamp(lift.y,10,BASE_H-LIFT_H-10);
 
-    lift.x=clamp(lift.x,10,BASE_W-LIFT_W-10);
-    lift.y=clamp(lift.y,10,BASE_H-LIFT_H-10);
+    const tip=forksTip(lift);
 
-    const now=Date.now();
-    for(const p of pallets){
-      if(!p.collected){
-        const dx=p.x-lift.x, dy=p.y-lift.y;
+    // Are we already carrying one?
+    let carrying=pallets.find(p=>p.attached && !p.collected);
+
+    // Try pick up
+    if(!carrying){
+      for(const p of pallets){
+        if(p.collected||p.attached) continue;
+        const dx=p.x-(lift.x+LIFT_W/2), dy=p.y-(lift.y+LIFT_H/2);
         const threshold=Math.max(PICK_RADIUS, p.size*0.8);
-        if(Math.hypot(dx,dy)<threshold){
-          p.collected=true;
-          score+=p.score;
-          pallets.push(spawnPallet());
-        }
+        if(Math.hypot(dx,dy)<threshold){ p.attached=true; startTimerIfNeeded(); break; }
       }
+      carrying=pallets.find(p=>p.attached && !p.collected);
     }
-    renderPallets(now);
 
-    liftEl.style.left=lift.x+'px'; liftEl.style.top=lift.y+'px';
-    liftEl.style.transform=`rotate(${lift.a}deg)`;
+    // Deliver if carrying + forks inside dock
+    if(carrying && inDock(tip.x,tip.y)){
+      carrying.collected=true; carrying.attached=false;
+      score+=carrying.score; delivered+=1;
+      pallets.push(spawnPallet());
+      if(delivered>=TARGET_DELIVERIES){ stopTimerAndLog(); delivered=TARGET_DELIVERIES; }
+    }
 
+    // Render
+    liftEl.style.left=lift.x+'px'; liftEl.style.top=lift.y+'px'; liftEl.style.transform=`rotate(${lift.a}deg)`;
+    renderPallets(Date.now());
     requestAnimationFrame(tick);
   }
   requestAnimationFrame(tick);
 
-  // ---- Reset ----
+  // Reset
   document.getElementById('reset').onclick=()=>{
-    lift={x:80,y:80,a:0}; score=0;
+    lift={x:80,y:80,a:0}; score=0; delivered=0;
     pallets.splice(0,pallets.length,...Array.from({length:6},()=>spawnPallet()));
     palletEls.forEach(el=>el.remove()); palletEls.clear();
     renderPallets();
+    deliveredEl.textContent='0'; scoreEl.textContent='0'; timerEl.textContent='00:00.0';
+    if(timerRAF) cancelAnimationFrame(timerRAF); runStart=null; timerRAF=null;
   };
 
-  // ---- Share button ----
+  // Share
   document.getElementById('share').onclick=async ()=>{
-    const url=location.href, text="Play my Forklift game!";
+    const url=location.href, text="Try my Forklift Dock Challenge!";
     try{
       if(navigator.share){ await navigator.share({title:"Forklift Game",text,url}); }
       else if(navigator.clipboard){ await navigator.clipboard.writeText(url); alert("Link copied:\n"+url); }
       else{ prompt("Copy this link:", url); }
-    }catch(e){ /* user cancelled */ }
+    }catch(e){}
   };
 
-  // ---- PWA SW ----
+  // Service worker
   if('serviceWorker' in navigator){ addEventListener('load',()=>navigator.serviceWorker.register('./sw.js').catch(()=>{})); }
 </script>
 </body>
