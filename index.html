@@ -109,3 +109,80 @@
     const stage = document.getElementById('stage');
     const scoreEl = document.getElementById('score');
     const totalEl = document.getElementById('total');
+
+    // Walls
+    [{l:0,t:0,w:BASE_W,h:10},{l:0,t:BASE_H-10,w:BASE_W,h:10},{l:0,t:0,w:10,h:BASE_H},{l:BASE_W-10,t:0,w:10,h:BASE_H}]
+      .forEach(s=>{const w=document.createElement('div');w.className='wall';
+        Object.assign(w.style,{left:s.l+'px',top:s.t+'px',width:s.w+'px',height:s.h+'px'});stage.appendChild(w);});
+
+    // Forklift (composed)
+    const liftEl=document.createElement('div'); liftEl.className='forklift';
+    liftEl.innerHTML=`<div class="lift-body"></div><div class="lift-cab"></div><div class="lift-mast"></div>
+      <div class="lift-forks"></div><div class="lift-wheel front"></div><div class="lift-wheel rear"></div>`;
+    stage.appendChild(liftEl);
+
+    // Pallets
+    const pallets=[{id:1,x:200,y:150,c:false},{id:2,x:350,y:300,c:false},{id:3,x:520,y:220,c:false},{id:4,x:700,y:120,c:false},{id:5,x:140,y:380,c:false}];
+    totalEl.textContent=pallets.length;
+    const palletEls=new Map();
+    function renderPallets(){
+      pallets.forEach(p=>{
+        let el=palletEls.get(p.id);
+        if(p.c){ if(el){el.remove(); palletEls.delete(p.id);} return; }
+        if(!el){ el=document.createElement('div'); el.className='pallet'; palletEls.set(p.id,el); stage.appendChild(el); }
+        el.style.left=p.x+'px'; el.style.top=p.y+'px';
+      });
+      scoreEl.textContent=pallets.filter(p=>p.c).length;
+    }
+    renderPallets();
+
+    // Input – keyboard
+    const keys={l:false,r:false,u:false,d:false};
+    addEventListener('keydown',e=>{if(e.key==='ArrowLeft')keys.l=true;if(e.key==='ArrowRight')keys.r=true;if(e.key==='ArrowUp')keys.u=true;if(e.key==='ArrowDown')keys.d=true;});
+    addEventListener('keyup',e=>{if(e.key==='ArrowLeft')keys.l=false;if(e.key==='ArrowRight')keys.r=false;if(e.key==='ArrowUp')keys.u=false;if(e.key==='ArrowDown')keys.d=false;});
+
+    // Input – touch pads
+    const activePads=new Set();
+    const padSet=(d,on)=>{on?activePads.add(d):activePads.delete(d);keys.l=activePads.has('left');keys.r=activePads.has('right');keys.u=activePads.has('up');keys.d=activePads.has('down');};
+    document.querySelectorAll('[data-pad]').forEach(el=>{
+      const start=e=>{e.preventDefault();padSet(el.dataset.pad,true);};
+      const end=e=>{e.preventDefault();padSet(el.dataset.pad,false);};
+      el.addEventListener('pointerdown',start); el.addEventListener('pointerup',end);
+      el.addEventListener('pointercancel',end); el.addEventListener('pointerleave',end);
+    });
+
+    // Center + scale stage to fit container
+    function fit(){
+      const cw=game.clientWidth; const s=Math.min(cw/BASE_W,1);
+      stage.style.transform=`translateX(${(cw-BASE_W*s)/2}px) scale(${s})`;
+      game.style.height=(BASE_H*s)+'px';
+    }
+    addEventListener('resize',fit); new ResizeObserver(fit).observe(game); fit();
+
+    // Game state/loop
+    let lift={x:80,y:80,a:0};
+    const clamp=(v,min,max)=>Math.max(min,Math.min(max,v));
+
+    function tick(){
+      if(keys.l) lift.a-=TURN; if(keys.r) lift.a+=TURN;
+      const rad=lift.a*Math.PI/180;
+      if(keys.u){lift.x+=SPEED*Math.cos(rad); lift.y+=SPEED*Math.sin(rad);}
+      if(keys.d){lift.x-=SPEED*Math.cos(rad); lift.y-=SPEED*Math.sin(rad);}
+
+      lift.x=clamp(lift.x,10,BASE_W-LIFT_W-10); lift.y=clamp(lift.y,10,BASE_H-LIFT_H-10);
+
+      for(const p of pallets){ if(!p.c){ const dx=p.x-lift.x, dy=p.y-lift.y; if(Math.hypot(dx,dy)<PALLET_RADIUS) p.c=true; } }
+      renderPallets();
+
+      liftEl.style.left=lift.x+'px'; liftEl.style.top=lift.y+'px'; liftEl.style.transform=`rotate(${lift.a}deg)`;
+      requestAnimationFrame(tick);
+    }
+    requestAnimationFrame(tick);
+
+    document.getElementById('reset').onclick=()=>{ lift={x:80,y:80,a:0}; pallets.forEach(p=>p.c=false); renderPallets(); };
+
+    // PWA service worker
+    if('serviceWorker' in navigator){ addEventListener('load', ()=>navigator.serviceWorker.register('./sw.js').catch(()=>{})); }
+  </script>
+</body>
+</html>
