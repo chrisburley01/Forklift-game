@@ -8,16 +8,24 @@
 <!-- PWA -->
 <link rel="manifest" href="manifest.json" />
 <meta name="theme-color" content="#0f172a" />
+<link rel="apple-touch-icon" href="icon-192.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black">
+<meta name="apple-mobile-web-app-title" content="Forklift">
 
 <style>
   :root { --bg:#0f172a; --panel:#111827; --line:#1f2937; --text:#e5e7eb; }
   *{box-sizing:border-box}
-  html,body{height:100%;margin:0;background:var(--bg);color:var(--text);font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif}
+  html,body{height:100%;margin:0;background:var(--bg);color:var(--text);
+    font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif}
   .wrap{max-width:980px;margin:0 auto;padding:16px}
-  .card{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:16px;box-shadow:0 10px 20px rgba(0,0,0,.2)}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:16px;
+    box-shadow:0 20px 40px rgba(0,0,0,.25), inset 0 1px 0 rgba(255,255,255,.03)}
   h1{margin:0 0 8px;line-height:1.05}
-  #game{position:relative;width:100%;margin:8px auto;background:#0f1a2a;border:2px solid #6b7280;border-radius:12px;overflow:hidden;touch-action:none}
-  #stage{position:relative;width:800px;height:500px;transform-origin:top left}
+  #game{position:relative;width:100%;margin:8px auto;
+    background: radial-gradient(1200px 600px at 30% -20%, #13213a 0%, #0f1a2a 45%, #0b1220 100%);
+    border:2px solid #6b7280;border-radius:12px;overflow:hidden;touch-action:none}
+  #stage{position:relative;width:800px;height:500px;transform-origin:top left;filter:drop-shadow(0 10px 18px rgba(0,0,0,.35))}
 
   /* Walls */
   .wall{position:absolute;background:#0b1220}
@@ -27,12 +35,15 @@
     position:absolute; top:50px; right:20px; width:100px; height:400px;
     background:rgba(34,197,94,.15); border:2px dashed #22c55e; border-radius:8px;
     display:flex; align-items:center; justify-content:center; color:#86efac; font-weight:700;
-    text-shadow:0 1px 2px rgba(0,0,0,.5);
+    text-shadow:0 1px 2px rgba(0,0,0,.5); animation:dockPulse 2.4s ease-in-out infinite;
   }
+  @keyframes dockPulse { 0%,100%{box-shadow:0 0 0 0 rgba(34,197,94,.35)} 50%{box-shadow:0 0 20px 8px rgba(34,197,94,.25)} }
 
   /* Forklift (composed) */
-  .forklift{position:absolute;width:46px;height:26px;transform-origin:center}
-  .lift-body{position:absolute;left:6px;top:6px;width:34px;height:14px;background:linear-gradient(180deg,#ffd84a,#facc15);border-radius:4px;border:1px solid #b08900;box-shadow:0 2px 8px rgba(0,0,0,.45) inset}
+  .forklift{position:absolute;width:46px;height:26px;transform-origin:center;transition:transform 80ms linear}
+  .lift-body{position:absolute;left:6px;top:6px;width:34px;height:14px;
+    background:linear-gradient(180deg,#ffe46a,#facc15 62%,#e6b80f);border-radius:4px;border:1px solid #b08900;
+    box-shadow:0 2px 8px rgba(0,0,0,.45) inset}
   .lift-cab{position:absolute;left:8px;top:2px;width:11px;height:10px;background:linear-gradient(180deg,#2f3640,#111827);border-radius:2px;border:1px solid #0b0f1a}
   .lift-mast{position:absolute;right:2px;top:2px;width:4px;height:18px;background:linear-gradient(180deg,#3b3f46,#1f2937);border-radius:2px;border:1px solid #161b22}
   .lift-forks{position:absolute;right:-10px;top:16px;width:20px;height:4px;background:linear-gradient(180deg,#c8a95a,#9a7a2c);border-radius:2px;box-shadow:0 0 0 1px #6b5b2a inset}
@@ -40,22 +51,23 @@
   .lift-wheel.front{left:10px}.lift-wheel.rear{left:28px}
 
   /* Pallets (size/colour via classes + inline size) */
-  .pallet{position:absolute;border-radius:4px;box-shadow:0 2px 6px rgba(0,0,0,.35);border:2px solid rgba(0,0,0,.25)}
+  .pallet{position:absolute;border-radius:4px;border:2px solid rgba(0,0,0,.25)}
   .pallet::before{content:"";position:absolute;inset:15% 20%;background:linear-gradient(90deg,#2f2f2f,#1f1f1f);opacity:.5;border-radius:2px}
-  .pallet.small  {background:repeating-linear-gradient(0deg,#9ec27f 0 6px,#7aa95a 6px 12px)}
-  .pallet.medium {background:repeating-linear-gradient(0deg,#b87333 0 6px,#a05e22 6px 12px)}
-  .pallet.large  {background:repeating-linear-gradient(0deg,#7fb1c2 0 6px,#5e97aa 6px 12px)}
-  .pallet.timed  {background:repeating-linear-gradient(0deg,#d97a5c 0 6px,#c55c3a 6px 12px)}
+  .pallet.small  {background:repeating-linear-gradient(0deg,#9ec27f 0 6px,#7aa95a 6px 12px); box-shadow:0 2px 10px rgba(118,185,114,.35)}
+  .pallet.medium {background:repeating-linear-gradient(0deg,#b87333 0 6px,#a05e22 6px 12px); box-shadow:0 2px 10px rgba(200,120,60,.35)}
+  .pallet.large  {background:repeating-linear-gradient(0deg,#7fb1c2 0 6px,#5e97aa 6px 12px); box-shadow:0 2px 12px rgba(100,160,190,.35)}
+  .pallet.timed  {background:repeating-linear-gradient(0deg,#d97a5c 0 6px,#c55c3a 6px 12px); box-shadow:0 2px 14px rgba(221,110,80,.45)}
 
   .row{display:flex;gap:8px;align-items:center;justify-content:space-between;flex-wrap:wrap}
-  .btn{padding:10px 14px;border-radius:10px;border:1px solid #374151;background:#1f2937;color:var(--text);cursor:pointer}
+  .btn{padding:10px 14px;border-radius:10px;border:1px solid #374151;background:#1f2937;color:var(--text);cursor:pointer;transition:transform .08s ease, box-shadow .08s ease}
+  .btn:active{transform:translateY(1px);box-shadow:0 1px 0 rgba(0,0,0,.2) inset}
   .hud{display:flex;gap:12px;align-items:center;flex-wrap:wrap}
   .hud-right{margin-left:auto;display:flex;gap:8px;align-items:center}
   .muted{opacity:.85}
 
   /* Touch controls */
   .controls{display:none;margin-top:12px;gap:8px;justify-content:center}
-  .pad{width:70px;height:70px;border-radius:12px;border:1px solid #374151;background:#1f2937;display:flex;align-items:center;justify-content:center;font-weight:700;user-select:none}
+  .pad{width:70px;height:70px;border-radius:12px;border:1px solid #374151;background:#1f2937;display:flex;align-items:center;justify-content:center;font-weight:700;user-select:none;font-size:20px;backdrop-filter:blur(2px)}
   @media (max-width: 820px){ .controls{display:flex} }
 </style>
 </head>
@@ -74,6 +86,7 @@
           <button id="reset" class="btn">Reset</button>
         </div>
         <div class="hud-right">
+          <button id="install" class="btn" style="display:none">Install</button>
           <button id="share" class="btn">Share</button>
         </div>
       </div>
@@ -94,6 +107,11 @@
     </div>
   </div>
 
+<!-- Sound hooks (add your small mp3s at repo root: pickup.mp3, deliver.mp3, timeout.mp3) -->
+<audio id="s-pickup"  src="./pickup.mp3"  preload="auto"></audio>
+<audio id="s-deliver" src="./deliver.mp3" preload="auto"></audio>
+<audio id="s-timeout" src="./timeout.mp3" preload="auto"></audio>
+
 <script>
   // ---------- World ----------
   const BASE_W=800, BASE_H=500, LIFT_W=46, LIFT_H=26;
@@ -110,6 +128,8 @@
   const bestEl      = document.getElementById('best');
   const lastEl      = document.getElementById('last');
   const runsEl      = document.getElementById('runs');
+
+  const snd = id => document.getElementById(id)?.play().catch(()=>{});
 
   // Walls
   [{l:0,t:0,w:BASE_W,h:10},{l:0,t:BASE_H-10,w:BASE_W,h:10},{l:0,t:0,w:10,h:BASE_H},{l:BASE_W-10,t:0,w:10,h:BASE_H}]
@@ -144,7 +164,7 @@
     const t=TYPES[Math.floor(Math.random()*TYPES.length)];
     return {
       id: makeId(),
-      x: rand(40, BASE_W-160), // keep some distance from dock
+      x: rand(40, BASE_W-160),
       y: rand(40, BASE_H-60),
       type: t.k, size: t.size, score: t.score,
       expiresAt: t.life ? Date.now()+t.life : null,
@@ -168,7 +188,9 @@
       if(p.collected){ if(el){el.remove(); palletEls.delete(p.id);} return; }
 
       if(p.expiresAt && !p.attached && now>p.expiresAt){
-        p.collected=true; if(el){el.remove(); palletEls.delete(p.id);} pallets.push(spawnPallet()); return;
+        p.collected=true; if(el){el.remove(); palletEls.delete(p.id);} pallets.push(spawnPallet());
+        snd('s-timeout');
+        return;
       }
 
       if(!el){ el=document.createElement('div'); el.className=`pallet ${p.type}`; palletEls.set(p.id,el); stage.appendChild(el); }
@@ -193,11 +215,10 @@
     deliveredEl.textContent = delivered;
   }
 
-  // Input
+  // Input (keyboard + touch)
   const keys={l:false,r:false,u:false,d:false};
   addEventListener('keydown',e=>{if(e.key==='ArrowLeft')keys.l=true;if(e.key==='ArrowRight')keys.r=true;if(e.key==='ArrowUp')keys.u=true;if(e.key==='ArrowDown')keys.d=true;});
   addEventListener('keyup',e=>{if(e.key==='ArrowLeft')keys.l=false;if(e.key==='ArrowRight')keys.r=false;if(e.key==='ArrowUp')keys.u=false;if(e.key==='ArrowDown')keys.d=false;});
-  // Touch pads
   const activePads=new Set();
   const padSet=(d,on)=>{on?activePads.add(d):activePads.delete(d);keys.l=activePads.has('left');keys.r=activePads.has('right');keys.u=activePads.has('up');keys.d=activePads.has('down');};
   document.querySelectorAll('[data-pad]').forEach(el=>{
@@ -216,21 +237,19 @@
 
   // Timer + runs
   let runStart=null, timerRAF=null, delivered=0, score=0;
-  const runs=[]; // ms
-
+  const runs=[];
   const fmt=ms=>ms==null?"--:--.-":(()=>{const s=ms/1000,m=Math.floor(s/60),ss=Math.floor(s%60),t=Math.floor((s*10)%10);return `${String(m).padStart(2,'0')}:${String(ss).padStart(2,'0')}.${t}`;})();
-
   function startTimerIfNeeded(){ if(!runStart){ runStart=performance.now(); tickTimer(); } }
   function stopTimerAndLog(){
     if(!runStart) return;
     const elapsed=performance.now()-runStart;
     runs.push(elapsed);
-    lastEl.textContent=fmt(elapsed);
-    bestEl.textContent=fmt(Math.min(...runs));
-    runsEl.textContent=String(runs.length);
+    document.getElementById('last').textContent=fmt(elapsed);
+    document.getElementById('best').textContent=fmt(Math.min(...runs));
+    document.getElementById('runs').textContent=String(runs.length);
     cancelAnimationFrame(timerRAF); timerRAF=null; runStart=null;
   }
-  function tickTimer(){ if(!runStart) return; timerEl.textContent=fmt(performance.now()-runStart); timerRAF=requestAnimationFrame(tickTimer); }
+  function tickTimer(){ if(!runStart) return; document.getElementById('timer').textContent=fmt(performance.now()-runStart); timerRAF=requestAnimationFrame(tickTimer); }
 
   // Loop
   let lift={x:80,y:80,a:0};
@@ -245,7 +264,7 @@
 
     const tip=forksTip(lift);
 
-    // Are we already carrying one?
+    // Carrying?
     let carrying=pallets.find(p=>p.attached && !p.collected);
 
     // Try pick up
@@ -254,15 +273,17 @@
         if(p.collected||p.attached) continue;
         const dx=p.x-(lift.x+LIFT_W/2), dy=p.y-(lift.y+LIFT_H/2);
         const threshold=Math.max(PICK_RADIUS, p.size*0.8);
-        if(Math.hypot(dx,dy)<threshold){ p.attached=true; startTimerIfNeeded(); break; }
+        if(Math.hypot(dx,dy)<threshold){
+          p.attached=true; startTimerIfNeeded(); snd('s-pickup'); break;
+        }
       }
       carrying=pallets.find(p=>p.attached && !p.collected);
     }
 
-    // Deliver if carrying + forks inside dock
-    if(carrying && inDock(tip.x,tip.y)){
+    // Deliver if carrying & forks inside dock
+    if(carrying && (tip.x>=dock.x && tip.x<=dock.x+dock.w && tip.y>=dock.y && tip.y<=dock.y+dock.h)){
       carrying.collected=true; carrying.attached=false;
-      score+=carrying.score; delivered+=1;
+      score+=carrying.score; delivered+=1; snd('s-deliver');
       pallets.push(spawnPallet());
       if(delivered>=TARGET_DELIVERIES){ stopTimerAndLog(); delivered=TARGET_DELIVERIES; }
     }
@@ -280,7 +301,7 @@
     pallets.splice(0,pallets.length,...Array.from({length:6},()=>spawnPallet()));
     palletEls.forEach(el=>el.remove()); palletEls.clear();
     renderPallets();
-    deliveredEl.textContent='0'; scoreEl.textContent='0'; timerEl.textContent='00:00.0';
+    deliveredEl.textContent='0'; scoreEl.textContent='0'; document.getElementById('timer').textContent='00:00.0';
     if(timerRAF) cancelAnimationFrame(timerRAF); runStart=null; timerRAF=null;
   };
 
@@ -293,6 +314,16 @@
       else{ prompt("Copy this link:", url); }
     }catch(e){}
   };
+
+  // Install button (PWA)
+  let deferredPrompt=null;
+  const installBtn=document.getElementById('install');
+  window.addEventListener('beforeinstallprompt',(e)=>{ e.preventDefault(); deferredPrompt=e; installBtn.style.display='inline-flex'; });
+  installBtn?.addEventListener('click', async ()=>{
+    if(!deferredPrompt) return;
+    installBtn.disabled=true;
+    try{ await deferredPrompt.prompt(); await deferredPrompt.userChoice; } finally { deferredPrompt=null; installBtn.style.display='none'; }
+  });
 
   // Service worker
   if('serviceWorker' in navigator){ addEventListener('load',()=>navigator.serviceWorker.register('./sw.js').catch(()=>{})); }
