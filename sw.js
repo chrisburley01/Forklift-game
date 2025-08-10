@@ -1,5 +1,5 @@
 // Force a fresh cache on every deploy
-const CACHE = "forklift-v3";  // <-- bump this each time you want users to update
+const CACHE = "forklift-v7";  // <-- bump this each time you want users to update
 const ASSETS = ["./", "./index.html", "./manifest.json", "./icon-192.png", "./icon-512.png"];
 
 self.addEventListener("install", (e) => {
