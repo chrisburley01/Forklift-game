@@ -16,10 +16,13 @@
     .wrap{max-width:980px;margin:0 auto;padding:16px}
     .card{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:16px;box-shadow:0 10px 20px rgba(0,0,0,.2)}
     h1{margin:0 0 8px;line-height:1.05}
-    #game{position:relative;width:100%;height:auto;aspect-ratio:800/500;margin:8px auto;background:#0f1a2a;border:2px solid #6b7280;border-radius:12px;overflow:hidden;touch-action:none}
+    /* Outer container defines available width; height set by JS to match scaled stage */
+    #game{position:relative;width:100%;margin:8px auto;background:#0f1a2a;border:2px solid #6b7280;border-radius:12px;overflow:hidden;touch-action:none}
+    /* Inner fixed-size stage that we scale */
+    #stage{position:relative;width:800px;height:500px;transform-origin:top left}
     .wall{position:absolute;background:#0b1220}
-    .forklift{position:absolute;background:#facc15;border-radius:4px;box-shadow:0 2px 8px rgba(0,0,0,.4);transform-origin:center}
-    .pallet{position:absolute;background:#92400e;border:2px solid #b45309;border-radius:4px;box-shadow:0 2px 6px rgba(0,0,0,.3)}
+    .forklift{position:absolute;width:40px;height:20px;background:#facc15;border-radius:4px;box-shadow:0 2px 8px rgba(0,0,0,.4);transform-origin:center}
+    .pallet{position:absolute;width:30px;height:30px;background:#92400e;border:2px solid #b45309;border-radius:4px;box-shadow:0 2px 6px rgba(0,0,0,.3)}
     .row{display:flex;gap:8px;align-items:center;justify-content:space-between;flex-wrap:wrap}
     .btn{padding:10px 14px;border-radius:10px;border:1px solid #374151;background:#1f2937;color:var(--text);cursor:pointer}
     .hud{display:flex;gap:12px;align-items:center;flex-wrap:wrap}
@@ -40,7 +43,12 @@
         </div>
       </div>
       <p style="margin:8px 0 12px">Keyboard: Arrow keys. On phone: use the pads below.</p>
-      <div id="game" aria-label="Forklift game area"></div>
+
+      <!-- Game -->
+      <div id="game" aria-label="Forklift game area">
+        <div id="stage"></div>
+      </div>
+
       <div class="controls">
         <div class="pad" data-pad="left">⟵</div>
         <div style="display:flex;flex-direction:column;gap:8px">
@@ -53,23 +61,20 @@
   </div>
 
   <script>
-    // --- Base (unscaled) world units ---
+    // ---- Constants (base pixels) ----
     const BASE_W = 800, BASE_H = 500;
     const LIFT_W = 40, LIFT_H = 20;
     const SPEED = 4, TURN = 4;
     const PALLET_RADIUS = 30;
 
-    // scale = how many screen pixels per base unit
-    let scale = 1;
-
+    // Elements
     const game = document.getElementById('game');
-
-    // UI
+    const stage = document.getElementById('stage');
     const scoreEl = document.getElementById('score');
     const totalEl = document.getElementById('total');
 
-    // State (in base units)
-    let forklift = { x: 80, y: 80, angle: 0 };
+    // Game state (base units)
+    let forklift = { x:80, y:80, angle:0 };
     const pallets = [
       { id:1, x:200, y:150, collected:false },
       { id:2, x:350, y:300, collected:false },
@@ -79,109 +84,101 @@
     ];
     totalEl.textContent = pallets.length;
 
-    // Elements
+    // Build walls (fixed px on stage)
+    [
+      {left:0, top:0, width:BASE_W, height:10},
+      {left:0, top:BASE_H-10, width:BASE_W, height:10},
+      {left:0, top:0, width:10, height:BASE_H},
+      {left:BASE_W-10, top:0, width:10, height:BASE_H}
+    ].forEach(s=>{
+      const w=document.createElement('div'); w.className='wall';
+      Object.assign(w.style, {left:s.left+'px', top:s.top+'px', width:s.width+'px', height:s.height+'px'});
+      stage.appendChild(w);
+    });
+
+    // Forklift
     const liftEl = document.createElement('div');
     liftEl.className = 'forklift';
-    game.appendChild(liftEl);
+    Object.assign(liftEl.style, { width:LIFT_W+'px', height:LIFT_H+'px' });
+    stage.appendChild(liftEl);
 
+    // Pallets
     const palletEls = new Map();
+    function renderPallets(){
+      pallets.forEach(p=>{
+        let el = palletEls.get(p.id);
+        if(p.collected){ if(el){ el.remove(); palletEls.delete(p.id); } return; }
+        if(!el){ el = document.createElement('div'); el.className='pallet'; el.style.width='30px'; el.style.height='30px'; palletEls.set(p.id, el); stage.appendChild(el); }
+        el.style.left = p.x + 'px';
+        el.style.top  = p.y + 'px';
+      });
+      scoreEl.textContent = pallets.filter(p=>p.collected).length;
+    }
+    renderPallets();
 
-    // Walls (use percentages so they scale automatically)
-    const walls = [
-      {left:0, top:0, width:'100%', height:'10px'},
-      {left:0, bottom:0, width:'100%', height:'10px'},
-      {top:0, left:0, width:'10px', height:'100%'},
-      {top:0, right:0, width:'10px', height:'100%'}
-    ];
-    walls.forEach(s => { const w = document.createElement('div'); w.className='wall'; Object.assign(w.style, s); game.appendChild(w); });
-
-    // Input
+    // Input: keyboard
     const keys = { left:false, right:false, up:false, down:false };
-    window.addEventListener('keydown', e => {
-      if(e.key==='ArrowLeft')  keys.left = true;
-      if(e.key==='ArrowRight') keys.right = true;
-      if(e.key==='ArrowUp')    keys.up = true;
-      if(e.key==='ArrowDown')  keys.down = true;
+    addEventListener('keydown', e=>{
+      if(e.key==='ArrowLeft') keys.left=true;
+      if(e.key==='ArrowRight') keys.right=true;
+      if(e.key==='ArrowUp') keys.up=true;
+      if(e.key==='ArrowDown') keys.down=true;
     });
-    window.addEventListener('keyup', e => {
-      if(e.key==='ArrowLeft')  keys.left = false;
-      if(e.key==='ArrowRight') keys.right = false;
-      if(e.key==='ArrowUp')    keys.up = false;
-      if(e.key==='ArrowDown')  keys.down = false;
+    addEventListener('keyup', e=>{
+      if(e.key==='ArrowLeft') keys.left=false;
+      if(e.key==='ArrowRight') keys.right=false;
+      if(e.key==='ArrowUp') keys.up=false;
+      if(e.key==='ArrowDown') keys.down=false;
     });
 
-    // Touch pads
+    // Input: touch pads
     const activePads = new Set();
-    function padSet(dir, on){ on ? activePads.add(dir) : activePads.delete(dir); syncPads(); }
-    function syncPads(){ keys.left=activePads.has('left'); keys.right=activePads.has('right'); keys.up=activePads.has('up'); keys.down=activePads.has('down'); }
-    function wirePad(el, dir){
-      const start = (e)=>{ e.preventDefault(); padSet(dir,true); };
-      const end   = (e)=>{ e.preventDefault(); padSet(dir,false); };
+    const padSet = (d,on)=>{ on?activePads.add(d):activePads.delete(d); syncPads(); };
+    const syncPads = ()=>{ keys.left=activePads.has('left'); keys.right=activePads.has('right'); keys.up=activePads.has('up'); keys.down=activePads.has('down'); };
+    document.querySelectorAll('[data-pad]').forEach(el=>{
+      const start=e=>{e.preventDefault(); padSet(el.dataset.pad,true);};
+      const end=e=>{e.preventDefault(); padSet(el.dataset.pad,false);};
       el.addEventListener('pointerdown', start);
       el.addEventListener('pointerup', end);
       el.addEventListener('pointercancel', end);
       el.addEventListener('pointerleave', end);
-    }
-    document.querySelectorAll('[data-pad]').forEach(el => wirePad(el, el.dataset.pad));
+    });
 
-    // Responsive scaling
-    function updateScale(){
-      // Fit to container width (game div) while preserving 800x500 aspect
-      const cw = game.clientWidth || window.innerWidth * 0.95;
-      scale = cw / BASE_W;
-      renderStatic();
+    // Scaling: scale stage to fit container width; set container height accordingly
+    function fit(){
+      const cw = game.clientWidth;         // available width inside the card
+      const s = Math.min(cw / BASE_W, 1);  // never upscale above 1 (looks crisp on desktop)
+      stage.style.transform = `scale(${s})`;
+      game.style.height = (BASE_H * s) + 'px';
     }
-    window.addEventListener('resize', updateScale);
-    new ResizeObserver(updateScale).observe(game);
-    updateScale();
+    addEventListener('resize', fit);
+    new ResizeObserver(fit).observe(game);
+    fit();
 
     // Helpers
-    const clamp = (v, min, max) => Math.max(min, Math.min(max, v));
+    const clamp = (v,min,max)=>Math.max(min,Math.min(max,v));
 
-    // Render pallets & static element sizes at current scale
-    function renderStatic(){
-      // Pallets
-      pallets.forEach(p=>{
-        let el = palletEls.get(p.id);
-        if(p.collected){ if(el){ el.remove(); palletEls.delete(p.id); } return; }
-        if(!el){ el = document.createElement('div'); el.className='pallet'; palletEls.set(p.id, el); game.appendChild(el); }
-        el.style.width  = (30*scale) + 'px';
-        el.style.height = (30*scale) + 'px';
-        el.style.left   = (p.x*scale) + 'px';
-        el.style.top    = (p.y*scale) + 'px';
-      });
-
-      // Forklift size (position updated every frame)
-      liftEl.style.width  = (LIFT_W*scale) + 'px';
-      liftEl.style.height = (LIFT_H*scale) + 'px';
-    }
-
-    // Main loop
+    // Loop
     function tick(){
-      // Move in base units
       if(keys.left)  forklift.angle -= TURN;
       if(keys.right) forklift.angle += TURN;
-      const rad = forklift.angle * Math.PI/180;
+      const rad = forklift.angle*Math.PI/180;
       if(keys.up){   forklift.x += SPEED*Math.cos(rad); forklift.y += SPEED*Math.sin(rad); }
       if(keys.down){ forklift.x -= SPEED*Math.cos(rad); forklift.y -= SPEED*Math.sin(rad); }
 
-      // Clamp to base bounds (subtract forklift size)
       forklift.x = clamp(forklift.x, 10, BASE_W - LIFT_W - 10);
       forklift.y = clamp(forklift.y, 10, BASE_H - LIFT_H - 10);
 
-      // Collect pallets (base distances)
-      let changed = false;
       for(const p of pallets){
         if(!p.collected){
           const dx = p.x - forklift.x, dy = p.y - forklift.y;
-          if(Math.hypot(dx,dy) < PALLET_RADIUS){ p.collected = true; changed = true; }
+          if(Math.hypot(dx,dy) < PALLET_RADIUS) p.collected = true;
         }
       }
-      if(changed){ scoreEl.textContent = pallets.filter(p=>p.collected).length; renderStatic(); }
+      renderPallets();
 
-      // Render forklift in scaled pixels
-      liftEl.style.left = (forklift.x*scale) + 'px';
-      liftEl.style.top  = (forklift.y*scale) + 'px';
+      liftEl.style.left = forklift.x + 'px';
+      liftEl.style.top  = forklift.y + 'px';
       liftEl.style.transform = `rotate(${forklift.angle}deg)`;
 
       requestAnimationFrame(tick);
@@ -192,15 +189,12 @@
     document.getElementById('reset').onclick = ()=>{
       forklift = { x:80, y:80, angle:0 };
       pallets.forEach(p=>p.collected=false);
-      scoreEl.textContent = 0;
-      renderStatic();
+      renderPallets();
     };
 
-    // PWA service worker
+    // PWA SW
     if ('serviceWorker' in navigator) {
-      window.addEventListener('load', () => {
-        navigator.serviceWorker.register('./sw.js', { scope: './' }).catch(()=>{});
-      });
+      addEventListener('load', () => navigator.serviceWorker.register('./sw.js').catch(()=>{}));
     }
   </script>
 </body>
