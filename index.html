@@ -5,7 +5,6 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no" />
 <title>Warehouse Forklift Driving Game</title>
 
-<!-- PWA hooks -->
 <link rel="manifest" href="manifest.json" />
 <meta name="theme-color" content="#0f172a" />
 <link rel="apple-touch-icon" href="icon-192.png">
@@ -14,116 +13,74 @@
 <meta name="apple-mobile-web-app-title" content="Forklift">
 
 <style>
-  :root { --bg:#0f172a; --panel:#111827; --line:#1f2937; --text:#e5e7eb; --dvh: 100dvh; }
-  *{box-sizing:border-box}
-  html,body{
-    height:100%; margin:0; background:var(--bg); color:var(--text);
-    font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;
-    padding:
-      env(safe-area-inset-top)
-      env(safe-area-inset-right)
-      env(safe-area-inset-bottom)
-      env(safe-area-inset-left);
-    overflow-x:hidden;
-  }
-  .wrap{max-width:980px;margin:0 auto;padding:16px}
-  .card{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:16px;
-    box-shadow:0 20px 40px rgba(0,0,0,.25), inset 0 1px 0 rgba(255,255,255,.03)}
-  h1{margin:0 0 8px;line-height:1.05}
+:root { --bg:#0f172a; --panel:#111827; --line:#1f2937; --text:#e5e7eb; --dvh: 100dvh; }
+*{box-sizing:border-box}
+html,body{
+  height:100%; margin:0; background:var(--bg); color:var(--text);
+  font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;
+  padding:
+    env(safe-area-inset-top)
+    env(safe-area-inset-right)
+    env(safe-area-inset-bottom)
+    env(safe-area-inset-left);
+  overflow-x:hidden;
+}
+.wrap{max-width:980px;margin:0 auto;padding:16px}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:16px;
+  box-shadow:0 20px 40px rgba(0,0,0,.25), inset 0 1px 0 rgba(255,255,255,.03)}
+h1{margin:0 0 8px;line-height:1.05}
 
-  /* Rolling warehouse floor with parallax; bgx/bgy set from JS */
-  #game{
-    --bgx: 0px; --bgy: 0px;
-    position:relative;width:100%;margin:8px auto;
-    background:
-      radial-gradient(1200px 600px at 30% -20%, #13213a 0%, #0f1a2a 45%, #0b1220 100%),
-      repeating-linear-gradient(0deg,  rgba(255,255,255,.04) 0 2px, transparent 2px 22px),
-      repeating-linear-gradient(90deg, rgba(255,255,255,.03) 0 2px, transparent 2px 22px);
-    background-position:
-      center center,
-      calc(var(--bgx)) calc(var(--bgy)),
-      calc(var(--bgx) / 2) calc(var(--bgy) / 2);
-    background-size:
-      auto,
-      24px 24px,
-      48px 48px;
-    will-change: background-position;
-    border:2px solid #6b7280;border-radius:12px;overflow:hidden;touch-action:none;
-    max-height: calc(var(--dvh) - 220px); /* ALWAYS fits on phones */
-  }
-  #stage{position:relative;width:800px;height:500px;transform-origin:top left;filter:drop-shadow(0 10px 18px rgba(0,0,0,.35))}
+/* Rolling floor with parallax */
+#game{
+  --bgx: 0px; --bgy: 0px;
+  position:relative;width:100%;margin:8px auto;
+  background:
+    radial-gradient(1200px 600px at 30% -20%, #13213a 0%, #0f1a2a 45%, #0b1220 100%),
+    repeating-linear-gradient(0deg,  rgba(255,255,255,.04) 0 2px, transparent 2px 22px),
+    repeating-linear-gradient(90deg, rgba(255,255,255,.03) 0 2px, transparent 2px 22px);
+  background-position:
+    center center,
+    calc(var(--bgx)) calc(var(--bgy)),
+    calc(var(--bgx) / 2) calc(var(--bgy) / 2);
+  background-size:
+    auto,
+    24px 24px,
+    48px 48px;
+  will-change: background-position;
+  border:2px solid #6b7280;border-radius:12px;overflow:hidden;touch-action:none;
+  max-height: calc(var(--dvh) - 220px);
+}
+#stage{position:relative;width:800px;height:500px;transform-origin:top left;filter:drop-shadow(0 10px 18px rgba(0,0,0,.35))}
 
-  /* Walls */
-  .wall{position:absolute;background:#0b1220}
+/* Dock */
+.dock{
+  position:absolute; top:200px; right:20px; width:80px; height:100px;
+  background:rgba(34,197,94,.15); border:2px dashed #22c55e; border-radius:8px;
+  display:flex; align-items:center; justify-content:center; color:#86efac; font-weight:700;
+  text-shadow:0 1px 2px rgba(0,0,0,.5);
+}
 
-  /* Racking */
-  .rack { position:absolute; pointer-events:none; }
-  .rack .upright{
-    position:absolute; width:8px; height:100%;
-    background:linear-gradient(180deg,#335a7a,#1e3a55);
-    border:1px solid #122638; border-radius:2px;
-    box-shadow:0 1px 0 rgba(255,255,255,.05) inset, 0 6px 10px rgba(0,0,0,.25);
-  }
-  .rack .beam{
-    position:absolute; height:6px;
-    background:linear-gradient(180deg,#f97316,#ea580c);
-    border:1px solid #9a3f07; border-radius:2px;
-    box-shadow:0 1px 0 rgba(255,255,255,.08) inset, 0 3px 6px rgba(0,0,0,.3);
-  }
-  .rack.top  { top:16px;  left:20px; right:140px; height:80px; }
-  .rack.bot  { bottom:16px; left:20px; right:140px; height:80px; }
+/* Forklift */
+.forklift{position:absolute;width:56px;height:36px;transform-origin:center;}
+.forklift svg{width:56px;height:36px;display:block}
 
-  /* Dock */
-  .dock{
-    position:absolute; top:50px; right:20px; width:100px; height:400px;
-    background:rgba(34,197,94,.15); border:2px dashed #22c55e; border-radius:8px;
-    display:flex; align-items:center; justify-content:center; color:#86efac; font-weight:700;
-    text-shadow:0 1px 2px rgba(0,0,0,.5); animation:dockPulse 2.4s ease-in-out infinite;
-  }
-  @keyframes dockPulse { 0%,100%{box-shadow:0 0 0 0 rgba(34,197,94,.35)} 50%{box-shadow:0 0 20px 8px rgba(34,197,94,.25)} }
+/* Pallets */
+.pallet{position:absolute;border-radius:6px;border:1px solid rgba(0,0,0,.28);
+  box-shadow:0 1px 0 rgba(255,255,255,.08) inset, 0 6px 10px rgba(0,0,0,.28);
+  overflow:hidden;}
+.pallet.small {background:repeating-linear-gradient(0deg,#9bbd7b 0 7px,#84aa62 7px 14px);}
+.pallet.medium{background:repeating-linear-gradient(0deg,#c98954 0 7px,#a96e3e 7px 14px);}
+.pallet.large {background:repeating-linear-gradient(0deg,#78a9bd 0 7px,#5e93a8 7px 14px);}
+.pallet.timed {background:repeating-linear-gradient(0deg,#de8467 0 7px,#c66646 7px 14px);}
 
-  /* Forklift (high-detail SVG wrapper) */
-  .forklift{
-    position:absolute; width:56px; height:36px; transform-origin:center;
-    filter: drop-shadow(0 3px 6px rgba(0,0,0,.35));
-  }
-  .forklift svg{ width:56px; height:36px; display:block }
+.row{display:flex;gap:8px;align-items:center;justify-content:space-between;flex-wrap:wrap}
+.btn{padding:10px 14px;border-radius:10px;border:1px solid #374151;background:#1f2937;color:var(--text);cursor:pointer}
+.hud{display:flex;gap:12px;align-items:center;flex-wrap:wrap}
+.hud-right{margin-left:auto;display:flex;gap:8px;align-items:center}
 
-  /* Pallets */
-  .pallet{
-    position:absolute; border-radius:6px; border:1px solid rgba(0,0,0,.28);
-    box-shadow:0 1px 0 rgba(255,255,255,.08) inset, 0 6px 10px rgba(0,0,0,.28);
-    overflow:hidden;
-  }
-  .pallet.small{  background:repeating-linear-gradient(0deg,#9bbd7b 0 7px,#84aa62 7px 14px); }
-  .pallet.medium{ background:repeating-linear-gradient(0deg,#c98954 0 7px,#a96e3e 7px 14px); }
-  .pallet.large{  background:repeating-linear-gradient(0deg,#78a9bd 0 7px,#5e93a8 7px 14px); }
-  .pallet.timed{  background:repeating-linear-gradient(0deg,#de8467 0 7px,#c66646 7px 14px); }
-  .pallet::before{
-    content:""; position:absolute; inset:0;
-    background:linear-gradient(90deg, rgba(0,0,0,.18), rgba(255,255,255,.06) 10%, rgba(0,0,0,.12) 90%);
-    mix-blend-mode:multiply; opacity:.55; pointer-events:none;
-  }
-  .pallet::after{
-    content:""; position:absolute; left:6%; right:6%; bottom:-10%;
-    height:28%; border-radius:8px;
-    background: radial-gradient(50% 100% at 50% 0%, rgba(0,0,0,.25), transparent 70%);
-    pointer-events:none;
-  }
-  .pallet .strap{ position:absolute; left:12%; right:12%; top:42%; height:12%;
-    background:linear-gradient(90deg,#2b2b2b,#1a1a1a); opacity:.7; border-radius:2px; }
-  .pallet .label{ position:absolute; right:6px; bottom:6px; width:12px; height:8px;
-    background:#e8ecf3; border:1px solid rgba(0,0,0,.25); border-radius:2px; }
-
-  .row{display:flex;gap:8px;align-items:center;justify-content:space-between;flex-wrap:wrap}
-  .btn{padding:10px 14px;border-radius:10px;border:1px solid #374151;background:#1f2937;color:var(--text);cursor:pointer}
-  .hud{display:flex;gap:12px;align-items:center;flex-wrap:wrap}
-  .hud-right{margin-left:auto;display:flex;gap:8px;align-items:center}
-
-  /* Touch controls */
-  .controls{display:none;margin-top:12px;gap:8px;justify-content:center}
-  .pad{width:70px;height:70px;border-radius:12px;border:1px solid #374151;background:#1f2937;display:flex;align-items:center;justify-content:center;font-weight:700;user-select:none;font-size:20px}
-  @media (max-width: 820px){ .controls{display:flex} }
+.controls{display:none;margin-top:12px;gap:8px;justify-content:center}
+.pad{width:70px;height:70px;border-radius:12px;border:1px solid #374151;background:#1f2937;display:flex;align-items:center;justify-content:center;font-weight:700;user-select:none;font-size:20px}
+@media (max-width: 820px){ .controls{display:flex} }
 </style>
 </head>
 <body>
@@ -138,12 +95,13 @@
         <button id="reset" class="btn">Reset</button>
       </div>
       <div class="hud-right">
-        <button id="install" class="btn" style="display:none">Install</button>
         <button id="share" class="btn">Share</button>
       </div>
     </div>
 
-    <div id="game"><div id="stage"></div></div>
+    <div id="game">
+      <canvas id="stage" width="800" height="500"></canvas>
+    </div>
 
     <div class="controls">
       <div class="pad" data-pad="left">⟵</div>
@@ -157,24 +115,168 @@
 </div>
 
 <script>
-  const BASE_W=800, BASE_H=500, LIFT_W=56, LIFT_H=36;
-  const SPEED=4, TURN=4, PICK_RADIUS=30, TARGET=8;
+const BASE_W=800, BASE_H=500;
+const SPEED=2.5, TURN_SPEED=0.05, PICK_RADIUS=25, TARGET=8;
+document.getElementById('target').textContent=TARGET;
 
-  // 🚀 Boosted so rolling background is obvious
-  let bgx = 0, bgy = 0;
-  const BG_SPEED = 1.2;
-  const BG_IDLE  = 0.20;
+// Background vars
+let bgx = 0, bgy = 0;
+const BG_SPEED = 1.2; // boosted
+const BG_IDLE  = 0.20;
 
-  const game = document.getElementById('game');
-  const stage= document.getElementById('stage');
-  const scoreEl=document.getElementById('score');
-  const timerEl=document.getElementById('timer');
-  const deliveredEl=document.getElementById('delivered');
-  document.getElementById('target').textContent=TARGET;
+let keys={}, pallets=[], score=0, delivered=0, time=0, timerInterval;
+let lift={x:100,y:100,angle:0,carrying:null};
+const colors=['small','medium','large','timed'];
 
-  /* --- Rest of JS stays identical to the last version I sent --- */
-  /* You can paste in the rest of the script from the previous working build */
+const stage=document.getElementById('stage');
+const ctx=stage.getContext('2d');
 
+function spawnPallets(){
+  pallets=[];
+  for(let i=0;i<TARGET;i++){
+    pallets.push({
+      x:Math.random()*(BASE_W-40)+20,
+      y:Math.random()*(BASE_H-40)+20,
+      type: colors[Math.floor(Math.random()*colors.length)],
+      size: 20+Math.random()*20
+    });
+  }
+}
+
+function resetGame(){
+  score=0; delivered=0; time=0;
+  lift={x:100,y:100,angle:0,carrying:null};
+  spawnPallets();
+  document.getElementById('score').textContent=score;
+  document.getElementById('delivered').textContent=delivered;
+  document.getElementById('timer').textContent="00:00.0";
+  clearInterval(timerInterval);
+  timerInterval=setInterval(()=>{
+    time+=0.1;
+    const m = String(Math.floor(time/60)).padStart(2,'0');
+    const s = String(Math.floor(time%60)).padStart(2,'0');
+    const ms = Math.floor((time*10)%10);
+    document.getElementById('timer').textContent=`${m}:${s}.${ms}`;
+  },100);
+}
+document.getElementById('reset').onclick=resetGame;
+document.getElementById('share').onclick=()=>{
+  if(navigator.share){
+    navigator.share({
+      title:"Warehouse Forklift Driving Game",
+      text:`I delivered ${delivered}/${TARGET} pallets in ${document.getElementById('timer').textContent}!`,
+      url:location.href
+    });
+  } else {
+    alert("Sharing not supported on this device.");
+  }
+};
+
+function fit() {
+  const header   = document.querySelector('.row');
+  const controls = document.querySelector('.controls');
+  const vw  = Math.min(window.innerWidth,  document.documentElement.clientWidth);
+  const dvh = Math.min(window.innerHeight, document.documentElement.clientHeight);
+  const headerH   = header   ? header.getBoundingClientRect().height   : 0;
+  const controlsH = (controls && getComputedStyle(controls).display !== 'none')
+                     ? controls.getBoundingClientRect().height : 0;
+  const gutters   = 24;
+  const availableH = Math.max(240, dvh - headerH - controlsH - gutters);
+  const scale = Math.min(vw / BASE_W, availableH / BASE_H, 1);
+  const tx = (vw  - BASE_W * scale) / 2;
+  const ty = (availableH - BASE_H * scale) / 2;
+  stage.style.transform = `translate(${tx}px, ${Math.max(0, ty)}px) scale(${scale})`;
+  game.style.height = availableH + 'px';
+  game.style.maxHeight = availableH + 'px';
+}
+addEventListener('resize', fit);
+addEventListener('orientationchange', fit);
+new ResizeObserver(fit).observe(game);
+
+function tick(){
+  if(keys.left) lift.angle -= TURN_SPEED;
+  if(keys.right) lift.angle += TURN_SPEED;
+  if(keys.up || keys.down){
+    const dir = keys.up ? 1 : -1;
+    lift.x += Math.cos(lift.angle) * SPEED * dir;
+    lift.y += Math.sin(lift.angle) * SPEED * dir;
+    bgx -= dir * Math.cos(lift.angle) * SPEED * BG_SPEED;
+    bgy -= dir * Math.sin(lift.angle) * SPEED * BG_SPEED;
+  } else {
+    bgx -= BG_IDLE;
+    bgy -= BG_IDLE;
+  }
+  game.style.setProperty('--bgx', bgx + 'px');
+  game.style.setProperty('--bgy', bgy + 'px');
+
+  lift.x = Math.max(0, Math.min(BASE_W, lift.x));
+  lift.y = Math.max(0, Math.min(BASE_H, lift.y));
+
+  pallets.forEach((p,i)=>{
+    const dx = lift.x - p.x;
+    const dy = lift.y - p.y;
+    if(Math.hypot(dx,dy) < PICK_RADIUS && !lift.carrying){
+      lift.carrying = p;
+      pallets.splice(i,1);
+    }
+  });
+
+  if(lift.carrying && lift.x>750 && lift.y>250 && lift.y<350){
+    score += 10; delivered++;
+    lift.carrying=null;
+    document.getElementById('score').textContent=score;
+    document.getElementById('delivered').textContent=delivered;
+    if(delivered>=TARGET){
+      clearInterval(timerInterval);
+      alert("All pallets delivered!");
+    }
+  }
+}
+
+function render(){
+  ctx.clearRect(0,0,BASE_W,BASE_H);
+  // Dock
+  ctx.fillStyle="rgba(34,197,94,0.15)";
+  ctx.fillRect(750,250,50,100);
+  ctx.strokeStyle="#22c55e";
+  ctx.strokeRect(750,250,50,100);
+
+  pallets.forEach(p=>{
+    ctx.fillStyle={
+      small:'#84aa62', medium:'#a96e3e', large:'#5e93a8', timed:'#c66646'
+    }[p.type];
+    ctx.fillRect(p.x-10,p.y-10,p.size,p.size);
+  });
+
+  if(lift.carrying){
+    ctx.fillStyle={
+      small:'#84aa62', medium:'#a96e3e', large:'#5e93a8', timed:'#c66646'
+    }[lift.carrying.type];
+    ctx.fillRect(lift.x-10,lift.y-30,lift.carrying.size,lift.carrying.size);
+  }
+
+  ctx.save();
+  ctx.translate(lift.x,lift.y);
+  ctx.rotate(lift.angle);
+  ctx.fillStyle="yellow";
+  ctx.fillRect(-15,-10,30,20);
+  ctx.fillStyle="gray";
+  ctx.fillRect(10,-2,10,4);
+  ctx.restore();
+}
+
+function loop(){
+  tick(); render(); requestAnimationFrame(loop);
+}
+
+document.addEventListener('keydown',e=>{ keys[e.key.toLowerCase()] = true; });
+document.addEventListener('keyup',e=>{ keys[e.key.toLowerCase()] = false; });
+document.querySelectorAll('.pad').forEach(pad=>{
+  pad.addEventListener('touchstart',()=>keys[pad.dataset.pad]=true);
+  pad.addEventListener('touchend',()=>keys[pad.dataset.pad]=false);
+});
+
+resetGame(); fit(); loop();
 </script>
 </body>
 </html>
