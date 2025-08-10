@@ -1,0 +1,11 @@
+{
+  "name": "Warehouse Forklift Driving Game",
+  "short_name": "Forklift",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#0f172a",
+  "theme_color": "#0f172a",
+  "description": "Drive a forklift and collect pallets.",
+  "icons": []
+}
